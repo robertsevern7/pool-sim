@@ -8,14 +8,14 @@ const ASPECT_RATIO = TABLE_WIDTH_M / TABLE_HEIGHT_M;
 
 const RAIL_COLOR = "rgb(60, 30, 10)";
 const CLOTH_COLOR = "rgb(0, 100, 50)";
-const RAIL_THICKNESS = 8;
+const RAIL_THICKNESS = 32;
 
 export default function TableScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const padding = 24;
-  const maxWidth = screenWidth - padding * 2;
-  const maxHeight = screenHeight - padding * 2;
+  const maxWidth = screenWidth - padding * 2 - RAIL_THICKNESS * 2;
+  const maxHeight = screenHeight - padding * 2 - RAIL_THICKNESS * 2;
 
   let tableWidth: number;
   let tableHeight: number;
@@ -37,7 +37,7 @@ export default function TableScreen() {
           {
             width: tableWidth + RAIL_THICKNESS * 2,
             height: tableHeight + RAIL_THICKNESS * 2,
-            borderRadius: 4,
+            borderRadius: 10,
           },
         ]}
       >
