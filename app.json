@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "simulator": {
+        "device": "iPhone 17 Pro"
+      }
     },
     "android": {
       "adaptiveIcon": {
