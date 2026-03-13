@@ -3,6 +3,7 @@ import { View, StyleSheet, useWindowDimensions } from "react-native";
 // 9-foot table dimensions in meters (from pool-simulator engine)
 const TABLE_WIDTH_M = 2.84;
 const TABLE_HEIGHT_M = 1.42;
+// Vertical table: rendered height/width = long side / short side
 const ASPECT_RATIO = TABLE_WIDTH_M / TABLE_HEIGHT_M;
 
 const RAIL_COLOR = "rgb(60, 30, 10)";
@@ -19,12 +20,12 @@ export default function TableScreen() {
   let tableWidth: number;
   let tableHeight: number;
 
-  if (maxWidth / ASPECT_RATIO <= maxHeight) {
+  if (maxWidth * ASPECT_RATIO <= maxHeight) {
     tableWidth = maxWidth;
-    tableHeight = maxWidth / ASPECT_RATIO;
+    tableHeight = maxWidth * ASPECT_RATIO;
   } else {
     tableHeight = maxHeight;
-    tableWidth = maxHeight * ASPECT_RATIO;
+    tableWidth = maxHeight / ASPECT_RATIO;
   }
 
   return (
