@@ -1,8 +1,12 @@
 import { View, StyleSheet, useWindowDimensions } from "react-native";
+import { useLocalSearchParams } from "expo-router";
+import { useMemo } from "react";
+import { STANDARD_9_FOOT, BALL_RADIUS } from "../engine/physics/constants";
+import { ALL_SCENARIOS } from "../engine/scenarios";
+import Ball from "../components/Ball";
 
-// 9-foot table dimensions in meters (from pool-simulator engine)
-const TABLE_WIDTH_M = 2.84;
-const TABLE_HEIGHT_M = 1.42;
+const TABLE_WIDTH_M = STANDARD_9_FOOT.width;
+const TABLE_HEIGHT_M = STANDARD_9_FOOT.height;
 // Vertical table: rendered height/width = long side / short side
 const ASPECT_RATIO = TABLE_WIDTH_M / TABLE_HEIGHT_M;
 
@@ -11,21 +15,21 @@ const CLOTH_COLOR = "rgb(0, 100, 50)";
 const DIAMOND_COLOR = "rgb(220, 200, 140)";
 const RAIL_THICKNESS = 32;
 
-// Diamond segment = table divided into equal parts
-// Long rail: 8 segments, short rail: 4 segments
-// Segment size = TABLE_HEIGHT_M / 4 = TABLE_WIDTH_M / 8 = 0.355m
 const SEGMENT = TABLE_HEIGHT_M / 4;
-
-// Diamond positions as fractions along the cloth edge
-// Long rails (along TABLE_WIDTH_M): 7 diamonds at segments 1-3 and 5-7 (4 is the side pocket)
 const LONG_RAIL_POSITIONS = [1, 2, 3, 5, 6, 7].map((i) => (i * SEGMENT) / TABLE_WIDTH_M);
-// Short rails (along TABLE_HEIGHT_M): 3 diamonds at segments 1-3
 const SHORT_RAIL_POSITIONS = [1, 2, 3].map((i) => (i * SEGMENT) / TABLE_HEIGHT_M);
-
 const DIAMOND_SIZE = 8;
 
 export default function TableScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { scenario: scenarioId } = useLocalSearchParams<{ scenario?: string }>();
+
+  const balls = useMemo(() => {
+    if (!scenarioId) return [];
+    const scenario = ALL_SCENARIOS.find((s) => s.id === scenarioId);
+    if (!scenario) return [];
+    return scenario.createBalls();
+  }, [scenarioId]);
 
   const padding = 24;
   const maxWidth = screenWidth - padding * 2 - RAIL_THICKNESS * 2;
@@ -41,6 +45,12 @@ export default function TableScreen() {
     tableHeight = maxHeight;
     tableWidth = maxHeight / ASPECT_RATIO;
   }
+
+  // Scale from world meters to screen pixels
+  // Vertical: world X maps to screen Y, world Y maps to screen X
+  const scaleX = tableWidth / TABLE_HEIGHT_M;
+  const scaleY = tableHeight / TABLE_WIDTH_M;
+  const ballRadius = BALL_RADIUS * scaleX;
 
   const rc = RAIL_THICKNESS / 2 - DIAMOND_SIZE / 2;
   const d = DIAMOND_SIZE / 2;
@@ -59,7 +69,6 @@ export default function TableScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Rail border */}
       <View
         style={[
           styles.rail,
@@ -72,7 +81,6 @@ export default function TableScreen() {
       >
         {diamonds(tableWidth, tableHeight)}
 
-        {/* Cloth surface */}
         <View
           style={[
             styles.cloth,
@@ -82,6 +90,16 @@ export default function TableScreen() {
             },
           ]}
         />
+
+        {balls.map((ball, i) => (
+          <Ball
+            key={`ball-${i}`}
+            x={RAIL_THICKNESS + ball.pos[1] * scaleX}
+            y={RAIL_THICKNESS + ball.pos[0] * scaleY}
+            radius={ballRadius}
+            isCue={i === 0}
+          />
+        ))}
       </View>
     </View>
   );

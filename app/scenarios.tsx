@@ -1,7 +1,10 @@
 import { View, Text, StyleSheet, Pressable, FlatList } from "react-native";
+import { useRouter } from "expo-router";
 import { ALL_SCENARIOS } from "../engine/scenarios";
 
 export default function ScenariosScreen() {
+  const router = useRouter();
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -13,6 +16,7 @@ export default function ScenariosScreen() {
         renderItem={({ item }) => (
           <Pressable
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+            onPress={() => router.push({ pathname: "/table", params: { scenario: item.id } })}
           >
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardDesc}>{item.description}</Text>
