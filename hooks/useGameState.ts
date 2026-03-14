@@ -1,7 +1,12 @@
 import { useReducer, useRef, useCallback, useEffect } from "react";
 import type { BallState } from "../engine/physics/ball-state";
 import { STANDARD_9_FOOT } from "../engine/physics/constants";
-import { recordSimulation, Frame } from "../engine/physics/recorder";
+import {
+  recordSimulation,
+  recordTrajectories,
+  Frame,
+  Trajectory,
+} from "../engine/physics/recorder";
 
 type Mode = "preview" | "playing" | "done";
 
@@ -10,6 +15,7 @@ interface GameState {
   initialBalls: BallState[];
   frames: Frame[];
   frameIndex: number;
+  trajectories: Trajectory[];
 }
 
 type Action =
@@ -20,21 +26,23 @@ type Action =
 
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
-    case "LOAD_SCENARIO":
+    case "LOAD_SCENARIO": {
+      const frames = recordSimulation(action.balls, STANDARD_9_FOOT);
+      const trajectories = recordTrajectories(action.balls, STANDARD_9_FOOT);
       return {
         mode: "preview",
         initialBalls: action.balls,
-        frames: [],
+        frames,
         frameIndex: 0,
+        trajectories,
       };
+    }
 
     case "SHOOT": {
       if (state.mode !== "preview" || state.initialBalls.length === 0) return state;
-      const frames = recordSimulation(state.initialBalls, STANDARD_9_FOOT);
       return {
         ...state,
         mode: "playing",
-        frames,
         frameIndex: 0,
       };
     }
@@ -52,7 +60,6 @@ function reducer(state: GameState, action: Action): GameState {
       return {
         ...state,
         mode: "preview",
-        frames: [],
         frameIndex: 0,
       };
   }
@@ -63,6 +70,7 @@ const INITIAL_STATE: GameState = {
   initialBalls: [],
   frames: [],
   frameIndex: 0,
+  trajectories: [],
 };
 
 export function useGameState(initialBalls: BallState[]) {
@@ -116,6 +124,7 @@ export function useGameState(initialBalls: BallState[]) {
   return {
     mode: state.mode,
     balls: currentBalls,
+    trajectories: state.trajectories,
     shoot,
     reset,
   };

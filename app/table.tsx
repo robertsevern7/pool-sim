@@ -1,10 +1,12 @@
 import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS } from "../engine/physics/constants";
 import { ALL_SCENARIOS } from "../engine/scenarios";
 import { useGameState } from "../hooks/useGameState";
 import Ball from "../components/Ball";
+import TrajectoryLine from "../components/TrajectoryLine";
+import type { Vec2 } from "../engine/physics/vec2";
 import { strings } from "../constants/strings";
 
 const TABLE_WIDTH_M = STANDARD_9_FOOT.width;
@@ -32,7 +34,7 @@ export default function TableScreen() {
     return scenario.createBalls();
   }, [scenarioId]);
 
-  const { mode, balls, shoot, reset } = useGameState(initialBalls);
+  const { mode, balls, trajectories, shoot, reset } = useGameState(initialBalls);
 
   const padding = 24;
   const buttonHeight = scenarioId ? 60 : 0;
@@ -53,6 +55,14 @@ export default function TableScreen() {
   const scaleX = tableWidth / TABLE_HEIGHT_M;
   const scaleY = tableHeight / TABLE_WIDTH_M;
   const ballRadius = BALL_RADIUS * scaleX;
+
+  const toScreen = useCallback(
+    (pos: Vec2) => ({
+      x: RAIL_THICKNESS + pos[1] * scaleX,
+      y: RAIL_THICKNESS + pos[0] * scaleY,
+    }),
+    [scaleX, scaleY],
+  );
 
   const rc = RAIL_THICKNESS / 2 - DIAMOND_SIZE / 2;
   const d = DIAMOND_SIZE / 2;
@@ -86,6 +96,16 @@ export default function TableScreen() {
         <View
           style={[styles.cloth, { width: tableWidth, height: tableHeight }]}
         />
+
+        {mode === "preview" && trajectories.map((path, i) => (
+          <TrajectoryLine
+            key={`traj-${i}`}
+            path={path}
+            ballRadius={ballRadius}
+            toScreen={toScreen}
+            isCue={i === 0}
+          />
+        ))}
 
         {balls.map((ball, i) => (
           <Ball
