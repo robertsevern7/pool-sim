@@ -10,6 +10,7 @@ export default function RootLayout() {
     >
       <Stack.Screen name="index" options={{ title: "Home" }} />
       <Stack.Screen name="table" options={{ title: "Table" }} />
+      <Stack.Screen name="scenarios" options={{ title: "Scenarios" }} />
     </Stack>
   );
 }

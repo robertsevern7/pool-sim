@@ -8,6 +8,9 @@ export default function Index() {
       <Link href="/table" style={styles.link}>
         <Text style={styles.linkText}>Go to the Table</Text>
       </Link>
+      <Link href="/scenarios" style={[styles.link, { marginTop: 12 }]}>
+        <Text style={styles.linkText}>Scenarios</Text>
+      </Link>
     </View>
   );
 }
