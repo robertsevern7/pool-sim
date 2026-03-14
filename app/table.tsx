@@ -14,9 +14,11 @@ const TABLE_HEIGHT_M = STANDARD_9_FOOT.height;
 const ASPECT_RATIO = TABLE_WIDTH_M / TABLE_HEIGHT_M;
 
 const RAIL_COLOR = "rgb(60, 30, 10)";
+const CUSHION_COLOR = "rgb(0, 85, 42)";
 const CLOTH_COLOR = "rgb(0, 100, 50)";
 const DIAMOND_COLOR = "rgb(220, 200, 140)";
 const RAIL_THICKNESS = 32;
+const CUSHION_THICKNESS = 14;
 
 const SEGMENT = TABLE_HEIGHT_M / 4;
 const LONG_RAIL_POSITIONS = [1, 2, 3, 5, 6, 7].map((i) => (i * SEGMENT) / TABLE_WIDTH_M);
@@ -38,8 +40,9 @@ export default function TableScreen() {
 
   const padding = 24;
   const buttonHeight = scenarioId ? 60 : 0;
-  const maxWidth = screenWidth - padding * 2 - RAIL_THICKNESS * 2;
-  const maxHeight = screenHeight - padding * 2 - RAIL_THICKNESS * 2 - buttonHeight;
+  const border = RAIL_THICKNESS + CUSHION_THICKNESS;
+  const maxWidth = screenWidth - padding * 2 - border * 2;
+  const maxHeight = screenHeight - padding * 2 - border * 2 - buttonHeight;
 
   let tableWidth: number;
   let tableHeight: number;
@@ -58,8 +61,8 @@ export default function TableScreen() {
 
   const toScreen = useCallback(
     (pos: Vec2) => ({
-      x: RAIL_THICKNESS + pos[1] * scaleX,
-      y: RAIL_THICKNESS + pos[0] * scaleY,
+      x: border + pos[1] * scaleX,
+      y: border + pos[0] * scaleY,
     }),
     [scaleX, scaleY],
   );
@@ -69,10 +72,10 @@ export default function TableScreen() {
 
   const diamonds = (cw: number, ch: number) => {
     const sides: { key: string; fracs: number[]; pos: (f: number) => object }[] = [
-      { key: "l", fracs: LONG_RAIL_POSITIONS, pos: (f) => ({ left: rc, top: RAIL_THICKNESS + f * ch - d }) },
-      { key: "r", fracs: LONG_RAIL_POSITIONS, pos: (f) => ({ right: rc, top: RAIL_THICKNESS + f * ch - d }) },
-      { key: "t", fracs: SHORT_RAIL_POSITIONS, pos: (f) => ({ top: rc, left: RAIL_THICKNESS + f * cw - d }) },
-      { key: "b", fracs: SHORT_RAIL_POSITIONS, pos: (f) => ({ bottom: rc, left: RAIL_THICKNESS + f * cw - d }) },
+      { key: "l", fracs: LONG_RAIL_POSITIONS, pos: (f) => ({ left: rc, top: border + f * ch - d }) },
+      { key: "r", fracs: LONG_RAIL_POSITIONS, pos: (f) => ({ right: rc, top: border + f * ch - d }) },
+      { key: "t", fracs: SHORT_RAIL_POSITIONS, pos: (f) => ({ top: rc, left: border + f * cw - d }) },
+      { key: "b", fracs: SHORT_RAIL_POSITIONS, pos: (f) => ({ bottom: rc, left: border + f * cw - d }) },
     ];
     return sides.flatMap(({ key, fracs, pos }) =>
       fracs.map((f, i) => <View key={`${key}-${i}`} style={[styles.diamond, pos(f)]} />)
@@ -85,8 +88,8 @@ export default function TableScreen() {
         style={[
           styles.rail,
           {
-            width: tableWidth + RAIL_THICKNESS * 2,
-            height: tableHeight + RAIL_THICKNESS * 2,
+            width: tableWidth + border * 2,
+            height: tableHeight + border * 2,
             borderRadius: 10,
           },
         ]}
@@ -94,8 +97,18 @@ export default function TableScreen() {
         {diamonds(tableWidth, tableHeight)}
 
         <View
-          style={[styles.cloth, { width: tableWidth, height: tableHeight }]}
-        />
+          style={[
+            styles.cushion,
+            {
+              width: tableWidth + CUSHION_THICKNESS * 2,
+              height: tableHeight + CUSHION_THICKNESS * 2,
+            },
+          ]}
+        >
+          <View
+            style={[styles.cloth, { width: tableWidth, height: tableHeight }]}
+          />
+        </View>
 
         {mode === "preview" && trajectories.map((path, i) => (
           <TrajectoryLine
@@ -110,8 +123,8 @@ export default function TableScreen() {
         {balls.map((ball, i) => (
           <Ball
             key={`ball-${i}`}
-            x={RAIL_THICKNESS + ball.pos[1] * scaleX}
-            y={RAIL_THICKNESS + ball.pos[0] * scaleY}
+            x={border + ball.pos[1] * scaleX}
+            y={border + ball.pos[0] * scaleY}
             radius={ballRadius}
             isCue={i === 0}
           />
@@ -148,6 +161,12 @@ const styles = StyleSheet.create({
     backgroundColor: RAIL_COLOR,
     justifyContent: "center",
     alignItems: "center",
+  },
+  cushion: {
+    backgroundColor: CUSHION_COLOR,
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    borderRadius: 3,
   },
   cloth: {
     backgroundColor: CLOTH_COLOR,
