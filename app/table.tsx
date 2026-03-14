@@ -13,10 +13,10 @@ const TABLE_WIDTH_M = STANDARD_9_FOOT.width;
 const TABLE_HEIGHT_M = STANDARD_9_FOOT.height;
 const ASPECT_RATIO = TABLE_WIDTH_M / TABLE_HEIGHT_M;
 
-const RAIL_COLOR = "rgb(60, 30, 10)";
-const CUSHION_COLOR = "rgb(0, 85, 42)";
-const CLOTH_COLOR = "rgb(0, 100, 50)";
-const DIAMOND_COLOR = "rgb(220, 200, 140)";
+const RAIL_COLOR = "rgb(20, 20, 20)";
+const CUSHION_COLOR = "rgb(45, 45, 45)";
+const CLOTH_COLOR = "rgb(90, 170, 210)";
+const DIAMOND_COLOR = "rgb(240, 240, 240)";
 const RAIL_THICKNESS = 32;
 const CUSHION_THICKNESS = 14;
 
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 16,
-    backgroundColor: "#006432",
+    backgroundColor: "#2a6a8a",
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 8,
