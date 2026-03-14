@@ -21,6 +21,7 @@ export default function Ball({ x, y, radius, isCue }: BallProps) {
           height: size,
           borderRadius: radius,
           backgroundColor: isCue ? CUE_COLOR : OBJ_COLOR,
+          borderColor: isCue ? CUE_COLOR : OBJ_COLOR,
           left: x - radius,
           top: y - radius,
         },
@@ -33,6 +34,5 @@ const styles = StyleSheet.create({
   ball: {
     position: "absolute",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.3)",
   },
 });

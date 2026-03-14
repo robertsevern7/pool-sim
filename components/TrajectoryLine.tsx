@@ -13,8 +13,8 @@ const CUE_LINE_COLOR = "rgba(255, 255, 240, 0.25)";
 const OBJ_LINE_COLOR = "rgba(230, 50, 50, 0.25)";
 const CUE_GHOST_COLOR = "rgb(180, 180, 170)";
 const OBJ_GHOST_COLOR = "rgb(150, 50, 50)";
-const GHOST_BORDER_CUE = "rgb(210, 210, 200)";
-const GHOST_BORDER_OBJ = "rgb(180, 70, 70)";
+const GHOST_BORDER_CUE = CUE_GHOST_COLOR;
+const GHOST_BORDER_OBJ = OBJ_GHOST_COLOR;
 
 export default function TrajectoryLine({ path, ballRadius, toScreen, isCue }: TrajectoryLineProps) {
   if (path.length < 2) return null;
