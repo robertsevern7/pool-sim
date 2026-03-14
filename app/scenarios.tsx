@@ -1,21 +1,11 @@
 import { View, Text, StyleSheet, Pressable, FlatList } from "react-native";
-
-const SCENARIOS = [
-  { id: "rolling_direct", name: "Rolling Direct", description: "Natural roll into object ball" },
-  { id: "half_ball_rolling", name: "Rolling ½ Ball", description: "Rolling cut shot" },
-  { id: "stop_shot", name: "Stop Shot", description: "Backspin — cue stops dead" },
-  { id: "half_ball_stun", name: "Stun ½ Ball", description: "Stun cut along tangent line" },
-  { id: "max_draw", name: "Max Draw", description: "Full backspin — cue draws back" },
-  { id: "max_follow", name: "Max Follow", description: "Full topspin — cue follows through" },
-  { id: "lag_shot", name: "Lag Shot", description: "Gentle roll to far rail and back" },
-  { id: "baulk_to_rail", name: "Baulk to Rail", description: "Calibration — just reaches far rail" },
-];
+import { ALL_SCENARIOS } from "../engine/scenarios";
 
 export default function ScenariosScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={SCENARIOS}
+        data={ALL_SCENARIOS}
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.grid}

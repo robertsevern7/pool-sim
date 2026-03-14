@@ -1,15 +1,16 @@
 import { Link } from "expo-router";
 import { Text, View, StyleSheet } from "react-native";
+import { strings } from "../constants/strings";
 
 export default function Index() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Pool Simulator</Text>
+      <Text style={styles.title}>{strings.app.title}</Text>
       <Link href="/table" style={styles.link}>
-        <Text style={styles.linkText}>Go to the Table</Text>
+        <Text style={styles.linkText}>{strings.home.goToTable}</Text>
       </Link>
       <Link href="/scenarios" style={[styles.link, { marginTop: 12 }]}>
-        <Text style={styles.linkText}>Scenarios</Text>
+        <Text style={styles.linkText}>{strings.home.scenarios}</Text>
       </Link>
     </View>
   );

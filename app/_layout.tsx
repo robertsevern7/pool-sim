@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { strings } from "../constants/strings";
 
 export default function RootLayout() {
   return (
@@ -8,9 +9,9 @@ export default function RootLayout() {
         headerTintColor: "#dcdcdc",
       }}
     >
-      <Stack.Screen name="index" options={{ title: "Home" }} />
-      <Stack.Screen name="table" options={{ title: "Table" }} />
-      <Stack.Screen name="scenarios" options={{ title: "Scenarios" }} />
+      <Stack.Screen name="index" options={{ title: strings.screens.home }} />
+      <Stack.Screen name="table" options={{ title: strings.screens.table }} />
+      <Stack.Screen name="scenarios" options={{ title: strings.screens.scenarios }} />
     </Stack>
   );
 }
