@@ -1,13 +1,14 @@
-import { View, StyleSheet, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS } from "../engine/physics/constants";
 import { ALL_SCENARIOS } from "../engine/scenarios";
+import { useGameState } from "../hooks/useGameState";
 import Ball from "../components/Ball";
+import { strings } from "../constants/strings";
 
 const TABLE_WIDTH_M = STANDARD_9_FOOT.width;
 const TABLE_HEIGHT_M = STANDARD_9_FOOT.height;
-// Vertical table: rendered height/width = long side / short side
 const ASPECT_RATIO = TABLE_WIDTH_M / TABLE_HEIGHT_M;
 
 const RAIL_COLOR = "rgb(60, 30, 10)";
@@ -24,16 +25,19 @@ export default function TableScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { scenario: scenarioId } = useLocalSearchParams<{ scenario?: string }>();
 
-  const balls = useMemo(() => {
+  const initialBalls = useMemo(() => {
     if (!scenarioId) return [];
     const scenario = ALL_SCENARIOS.find((s) => s.id === scenarioId);
     if (!scenario) return [];
     return scenario.createBalls();
   }, [scenarioId]);
 
+  const { mode, balls, shoot, reset } = useGameState(initialBalls);
+
   const padding = 24;
+  const buttonHeight = scenarioId ? 60 : 0;
   const maxWidth = screenWidth - padding * 2 - RAIL_THICKNESS * 2;
-  const maxHeight = screenHeight - padding * 2 - RAIL_THICKNESS * 2;
+  const maxHeight = screenHeight - padding * 2 - RAIL_THICKNESS * 2 - buttonHeight;
 
   let tableWidth: number;
   let tableHeight: number;
@@ -46,8 +50,6 @@ export default function TableScreen() {
     tableWidth = maxHeight / ASPECT_RATIO;
   }
 
-  // Scale from world meters to screen pixels
-  // Vertical: world X maps to screen Y, world Y maps to screen X
   const scaleX = tableWidth / TABLE_HEIGHT_M;
   const scaleY = tableHeight / TABLE_WIDTH_M;
   const ballRadius = BALL_RADIUS * scaleX;
@@ -82,13 +84,7 @@ export default function TableScreen() {
         {diamonds(tableWidth, tableHeight)}
 
         <View
-          style={[
-            styles.cloth,
-            {
-              width: tableWidth,
-              height: tableHeight,
-            },
-          ]}
+          style={[styles.cloth, { width: tableWidth, height: tableHeight }]}
         />
 
         {balls.map((ball, i) => (
@@ -101,6 +97,22 @@ export default function TableScreen() {
           />
         ))}
       </View>
+
+      {scenarioId && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            pressed && styles.buttonPressed,
+            mode === "playing" && styles.buttonDisabled,
+          ]}
+          onPress={mode === "done" ? reset : shoot}
+          disabled={mode === "playing"}
+        >
+          <Text style={styles.buttonText}>
+            {mode === "done" ? strings.table.reset : strings.table.shoot}
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -126,5 +138,23 @@ const styles = StyleSheet.create({
     height: DIAMOND_SIZE,
     backgroundColor: DIAMOND_COLOR,
     transform: [{ rotate: "45deg" }],
+  },
+  button: {
+    marginTop: 16,
+    backgroundColor: "#006432",
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
   },
 });

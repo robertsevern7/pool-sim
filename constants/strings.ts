@@ -11,6 +11,10 @@ export const strings = {
     table: "Table",
     scenarios: "Scenarios",
   },
+  table: {
+    shoot: "Shoot",
+    reset: "Reset",
+  },
   scenarios: {
     rolling_direct: { name: "Rolling Direct", description: "Natural roll into object ball" },
     half_ball_rolling: { name: "Rolling ½ Ball", description: "Rolling cut shot" },
