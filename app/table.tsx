@@ -5,6 +5,7 @@ import { STANDARD_9_FOOT, BALL_RADIUS } from "../engine/physics/constants";
 import { ALL_SCENARIOS } from "../engine/scenarios";
 import { useGameState } from "../hooks/useGameState";
 import Ball from "../components/Ball";
+import Cushions from "../components/Cushions";
 import TrajectoryLine from "../components/TrajectoryLine";
 import type { Vec2 } from "../engine/physics/vec2";
 import { strings } from "../constants/strings";
@@ -14,7 +15,6 @@ const TABLE_HEIGHT_M = STANDARD_9_FOOT.height;
 const ASPECT_RATIO = TABLE_WIDTH_M / TABLE_HEIGHT_M;
 
 const RAIL_COLOR = "rgb(20, 20, 20)";
-const CUSHION_COLOR = "rgb(45, 45, 45)";
 const CLOTH_COLOR = "rgb(90, 170, 210)";
 const DIAMOND_COLOR = "rgb(240, 240, 240)";
 const RAIL_THICKNESS = 32;
@@ -98,17 +98,22 @@ export default function TableScreen() {
 
         <View
           style={[
-            styles.cushion,
+            styles.cloth,
             {
-              width: tableWidth + CUSHION_THICKNESS * 2,
-              height: tableHeight + CUSHION_THICKNESS * 2,
+              position: "absolute",
+              left: border,
+              top: border,
+              width: tableWidth,
+              height: tableHeight,
             },
           ]}
-        >
-          <View
-            style={[styles.cloth, { width: tableWidth, height: tableHeight }]}
-          />
-        </View>
+        />
+        <Cushions
+          tableWidth={tableWidth}
+          tableHeight={tableHeight}
+          railThickness={RAIL_THICKNESS}
+          cushionThickness={CUSHION_THICKNESS}
+        />
 
         {mode === "preview" && trajectories.map((path, i) => (
           <TrajectoryLine
@@ -161,12 +166,6 @@ const styles = StyleSheet.create({
     backgroundColor: RAIL_COLOR,
     justifyContent: "center",
     alignItems: "center",
-  },
-  cushion: {
-    backgroundColor: CUSHION_COLOR,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    borderRadius: 3,
   },
   cloth: {
     backgroundColor: CLOTH_COLOR,
