@@ -113,6 +113,7 @@ export default function TableScreen() {
           tableHeight={tableHeight}
           railThickness={RAIL_THICKNESS}
           cushionThickness={CUSHION_THICKNESS}
+          scale={scaleX}
         />
 
         {mode === "preview" && trajectories.map((path, i) => (

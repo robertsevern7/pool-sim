@@ -3,22 +3,15 @@ import { useMemo } from "react";
 
 const CUSHION_COLOR = "rgb(45, 45, 45)";
 
+const INCHES_TO_M = 0.0254;
+
 // Pocket cut configuration — tweak these values
 export const POCKET_CONFIG = {
-  cornerAngle: 45,   // degrees — cut angle at corner pockets
-  sideAngle: 85,     // degrees — cut angle at side pockets
-  cornerMouth: 22,   // px — pocket opening per cushion at corners
-  sideMouth: 14,     // px — pocket opening per cushion at side pockets
+  cornerAngle: 45,           // degrees — cut angle at corner pockets
+  sideAngle: 85,             // degrees — cut angle at side pockets
+  cornerPocketMouth: 4.5,    // inches — diagonal distance between nose tips at corner pockets
+  sidePocketMouth: 5,        // inches — gap at rail edge at side pockets (total)
 };
-
-const cornerCutDepth =
-  POCKET_CONFIG.cornerAngle >= 90
-    ? 0
-    : 14 / Math.tan((POCKET_CONFIG.cornerAngle * Math.PI) / 180);
-const sideCutDepth =
-  POCKET_CONFIG.sideAngle >= 90
-    ? 0
-    : 14 / Math.tan((POCKET_CONFIG.sideAngle * Math.PI) / 180);
 
 type Dir = "bl" | "br" | "tl" | "tr";
 
@@ -41,18 +34,22 @@ interface CushionsProps {
   tableHeight: number;
   railThickness: number;
   cushionThickness: number;
+  scale: number; // pixels per meter
 }
 
-export default function Cushions({ tableWidth, tableHeight, railThickness, cushionThickness }: CushionsProps) {
+export default function Cushions({ tableWidth, tableHeight, railThickness, cushionThickness, scale }: CushionsProps) {
   const elements = useMemo(() => {
     const cw = tableWidth + 2 * cushionThickness;
     const ch = tableHeight + 2 * cushionThickness;
     const R = railThickness;
     const CT = cushionThickness;
-    const cm = POCKET_CONFIG.cornerMouth;
-    const sm = POCKET_CONFIG.sideMouth;
-    const ccd = cornerCutDepth;
-    const scd = sideCutDepth;
+    const ccd = POCKET_CONFIG.cornerAngle >= 90 ? 0 : CT / Math.tan((POCKET_CONFIG.cornerAngle * Math.PI) / 180);
+    const scd = POCKET_CONFIG.sideAngle >= 90 ? 0 : CT / Math.tan((POCKET_CONFIG.sideAngle * Math.PI) / 180);
+    // Gap measured at the cushion rectangle ends (rail edge)
+    // Corner pocket mouth is measured diagonally between two perpendicular nose tips;
+    // divide by sqrt(2) to get the per-rail offset, then add ccd so the gap is at the tips
+    const cm = (POCKET_CONFIG.cornerPocketMouth * INCHES_TO_M * scale) / Math.SQRT2 + ccd;
+    const sm = (POCKET_CONFIG.sidePocketMouth / 2) * INCHES_TO_M * scale;
 
     const segments: { key: string; left: number; top: number; width: number; height: number }[] = [
       { key: "top",    left: R + cm,      top: R,               width: cw - 2 * cm, height: CT },
@@ -107,7 +104,7 @@ export default function Cushions({ tableWidth, tableHeight, railThickness, cushi
         )}
       </>
     );
-  }, [tableWidth, tableHeight, railThickness, cushionThickness]);
+  }, [tableWidth, tableHeight, railThickness, cushionThickness, scale]);
 
   return elements;
 }
