@@ -43,13 +43,13 @@ export default function Cushions({ tableWidth, tableHeight, railThickness, cushi
     const ch = tableHeight + 2 * cushionThickness;
     const R = railThickness;
     const CT = cushionThickness;
-    const ccd = POCKET_CONFIG.cornerAngle >= 90 ? 0 : CT / Math.tan((POCKET_CONFIG.cornerAngle * Math.PI) / 180);
-    const scd = POCKET_CONFIG.sideAngle >= 90 ? 0 : CT / Math.tan((POCKET_CONFIG.sideAngle * Math.PI) / 180);
+    const ccd = Math.round(POCKET_CONFIG.cornerAngle >= 90 ? 0 : CT / Math.tan((POCKET_CONFIG.cornerAngle * Math.PI) / 180));
+    const scd = Math.round(POCKET_CONFIG.sideAngle >= 90 ? 0 : CT / Math.tan((POCKET_CONFIG.sideAngle * Math.PI) / 180));
     // Gap measured at the cushion rectangle ends (rail edge)
     // Corner pocket mouth is measured diagonally between two perpendicular nose tips;
     // divide by sqrt(2) to get the per-rail offset, then add ccd so the gap is at the tips
-    const cm = (POCKET_CONFIG.cornerPocketMouth * INCHES_TO_M * scale) / Math.SQRT2 + ccd;
-    const sm = (POCKET_CONFIG.sidePocketMouth / 2) * INCHES_TO_M * scale;
+    const cm = Math.round((POCKET_CONFIG.cornerPocketMouth * INCHES_TO_M * scale) / Math.SQRT2 + ccd);
+    const sm = Math.round((POCKET_CONFIG.sidePocketMouth / 2) * INCHES_TO_M * scale);
 
     const segments: { key: string; left: number; top: number; width: number; height: number }[] = [
       { key: "top",    left: R + cm,      top: R,               width: cw - 2 * cm, height: CT },
