@@ -1,16 +1,16 @@
 import { View } from "react-native";
 import { useMemo } from "react";
 
-const CUSHION_COLOR = "rgb(45, 45, 45)";
+const CUSHION_COLOR = "rgb(65, 130, 170)";
 
 const INCHES_TO_M = 0.0254;
 
 // Pocket cut configuration — tweak these values
 export const POCKET_CONFIG = {
-  cornerAngle: 45,           // degrees — cut angle at corner pockets
-  sideAngle: 85,             // degrees — cut angle at side pockets
-  cornerPocketMouth: 4.5,    // inches — diagonal distance between nose tips at corner pockets
-  sidePocketMouth: 5,        // inches — gap at rail edge at side pockets (total)
+  cornerAngle: 38,           // degrees — cut angle at corner pockets (BCA: 142° opening = 180-142=38°)
+  sideAngle: 77,             // degrees — cut angle at side pockets (BCA: 103° opening = 180-103=77°)
+  cornerPocketMouth: 4.625,  // inches — nose-to-nose at corner pockets (BCA: 4 1/8"–5 1/8", mid=4 5/8")
+  sidePocketMouth: 5.25,     // inches — nose-to-nose at side pockets (BCA: 4 7/8"–5 5/8", mid=5 1/4")
 };
 
 type Dir = "bl" | "br" | "tl" | "tr";

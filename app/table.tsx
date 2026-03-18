@@ -6,6 +6,7 @@ import { ALL_SCENARIOS } from "../engine/scenarios";
 import { useGameState } from "../hooks/useGameState";
 import Ball from "../components/Ball";
 import Cushions from "../components/Cushions";
+import Pockets from "../components/Pockets";
 import TrajectoryLine from "../components/TrajectoryLine";
 import type { Vec2 } from "../engine/physics/vec2";
 import { strings } from "../constants/strings";
@@ -101,12 +102,19 @@ export default function TableScreen() {
             styles.cloth,
             {
               position: "absolute",
-              left: border,
-              top: border,
-              width: tableWidth,
-              height: tableHeight,
+              left: RAIL_THICKNESS,
+              top: RAIL_THICKNESS,
+              width: tableWidth + 2 * CUSHION_THICKNESS,
+              height: tableHeight + 2 * CUSHION_THICKNESS,
             },
           ]}
+        />
+        <Pockets
+          tableWidth={tableWidth}
+          tableHeight={tableHeight}
+          railThickness={RAIL_THICKNESS}
+          cushionThickness={CUSHION_THICKNESS}
+          scale={scaleX}
         />
         <Cushions
           tableWidth={tableWidth}
@@ -161,7 +169,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#1e1e1e",
+    backgroundColor: "#f5f0dc",
   },
   rail: {
     backgroundColor: RAIL_COLOR,
