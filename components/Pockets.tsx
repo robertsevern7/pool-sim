@@ -27,8 +27,12 @@ export default function Pockets({ tableWidth, tableHeight, railThickness, cushio
     const backR = clipW / 2;
     const clipH = cr * 0.85;
 
+    const ch = tableHeight + 2 * CT;
     const corners: { key: string; cx: number; cy: number; rot: number }[] = [
-      { key: "tr", cx: R + cw, cy: R, rot: 45 },
+      { key: "tl", cx: R,      cy: R,      rot: -45 },
+      { key: "tr", cx: R + cw, cy: R,      rot: 45 },
+      { key: "bl", cx: R,      cy: R + ch, rot: -135 },
+      { key: "br", cx: R + cw, cy: R + ch, rot: 135 },
     ];
 
     const views: React.JSX.Element[] = [];
