@@ -24,6 +24,8 @@ export const strings = {
     max_follow: { name: "Max Follow", description: "Full topspin — cue follows through" },
     lag_shot: { name: "Lag Shot", description: "Gentle roll to far rail and back" },
     baulk_to_rail: { name: "Baulk to Rail", description: "Calibration — just reaches far rail" },
+    pot_corner: { name: "Pot Corner", description: "Straight shot into corner pocket" },
+    pot_side: { name: "Pot Side", description: "Straight shot into side pocket" },
   },
 } as const;
 

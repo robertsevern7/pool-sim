@@ -28,3 +28,38 @@ export const STANDARD_9_FOOT: Table = {
   height: 1.42,
   railRestitution: RAIL_RESTITUTION,
 };
+
+// --- Pocket configuration (BCA spec) ---
+const INCHES_TO_M = 0.0254;
+
+export const POCKET_CONFIG = {
+  cornerAngle: 38,           // degrees — cut angle at corner pockets (BCA: 142° opening)
+  sideAngle: 77,             // degrees — cut angle at side pockets (BCA: 103° opening)
+  cornerPocketMouth: 4.625,  // inches — nose-to-nose at corner pockets
+  sidePocketMouth: 5.25,     // inches — nose-to-nose at side pockets
+  cornerClothRadius: 4.5,    // inches — cloth-side arc radius at corners
+  sideClothRadius: 2.5,      // inches — cloth-side arc radius at sides
+};
+
+export interface Pocket {
+  center: [number, number]; // meters — position on the table
+  fallRadius: number;       // meters — ball is potted when center enters this radius
+}
+
+export function getPockets(table: Table): Pocket[] {
+  const w = table.width;
+  const h = table.height;
+  const cornerFallRadius = (POCKET_CONFIG.cornerPocketMouth * INCHES_TO_M) / 2;
+  const sideFallRadius = (POCKET_CONFIG.sidePocketMouth * INCHES_TO_M) / 2;
+
+  return [
+    // Corner pockets (at the four corners of the playing surface)
+    { center: [0, 0],     fallRadius: cornerFallRadius },
+    { center: [w, 0],     fallRadius: cornerFallRadius },
+    { center: [0, h],     fallRadius: cornerFallRadius },
+    { center: [w, h],     fallRadius: cornerFallRadius },
+    // Side pockets (midpoints of the long rails)
+    { center: [w / 2, 0], fallRadius: sideFallRadius },
+    { center: [w / 2, h], fallRadius: sideFallRadius },
+  ];
+}

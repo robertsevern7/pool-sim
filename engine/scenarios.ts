@@ -64,4 +64,34 @@ export const ALL_SCENARIOS: Scenario[] = [
       new BallState([baulkX, CY], [speed, 0], speed / R, MotionState.ROLLING),
     ];
   }),
+  scenario("pot_corner", () => {
+    // Object ball near top-right corner, cue ball lined up for a straight pot
+    const pocketX = TABLE.width;
+    const pocketY = 0;
+    const objX = pocketX - 0.4;
+    const objY = pocketY + 0.4;
+    const cueX = objX - 0.6;
+    const cueY = objY + 0.6;
+    // Aim direction: from cue toward object ball
+    const dx = objX - cueX;
+    const dy = objY - cueY;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    return [
+      cueStrike([cueX, cueY], [dx / len, dy / len], 2.5),
+      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+    ];
+  }),
+  scenario("pot_side", () => {
+    // Object ball near the right side pocket, cue ball lined up straight
+    const pocketX = TABLE.width / 2;
+    const pocketY = 0;
+    const objX = pocketX;
+    const objY = pocketY + 0.3;
+    const cueX = pocketX;
+    const cueY = objY + 0.8;
+    return [
+      cueStrike([cueX, cueY], [0, -1], 2.5),
+      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+    ];
+  }),
 ];

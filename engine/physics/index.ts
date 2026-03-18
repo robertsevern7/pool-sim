@@ -13,4 +13,7 @@ export {
   MU_ROLL,
   RAIL_RESTITUTION,
   MAX_CUE_SPIN,
+  POCKET_CONFIG,
+  getPockets,
 } from "./constants";
+export type { Pocket } from "./constants";

@@ -1,13 +1,10 @@
 import { View } from "react-native";
 import { useMemo } from "react";
-import { POCKET_CONFIG } from "./Cushions";
+import { POCKET_CONFIG } from "../engine/physics/constants";
 
 const POCKET_COLOR = "#f5f0dc";
 const INCHES_TO_M = 0.0254;
 
-export const SIDE_POCKET_CONFIG = {
-  clothRadius: 2.5,    // inches — arc at the cloth/playing side
-};
 
 interface SidePocketsProps {
   tableWidth: number;
@@ -24,7 +21,7 @@ export default function SidePockets({ tableWidth, tableHeight, railThickness, cu
     const cw = tableWidth + 2 * CT;
     const ch = tableHeight + 2 * CT;
 
-    const cr = SIDE_POCKET_CONFIG.clothRadius * INCHES_TO_M * scale;
+    const cr = POCKET_CONFIG.sideClothRadius * INCHES_TO_M * scale;
     const sm = (POCKET_CONFIG.sidePocketMouth / 2) * INCHES_TO_M * scale;
     const scd = POCKET_CONFIG.sideAngle >= 90 ? 0 : CT / Math.tan((POCKET_CONFIG.sideAngle * Math.PI) / 180);
 

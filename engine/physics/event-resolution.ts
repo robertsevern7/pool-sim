@@ -73,6 +73,9 @@ export function resolveEvent(
     }
 
     resolveRailCollision(ball, normal, RAIL_RESTITUTION);
+  } else if (event.eventType === "POCKET") {
+    // Remove the potted ball
+    state.balls.splice(event.a, 1);
   } else if (event.eventType === "STATE_CHANGE") {
     const ball = state.balls[event.a];
 

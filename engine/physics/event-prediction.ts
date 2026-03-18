@@ -1,6 +1,6 @@
 import { MotionState } from "./ball-state";
-import { G } from "./constants";
-import type { Table } from "./constants";
+import { G, getPockets } from "./constants";
+import type { Table, Pocket } from "./constants";
 import type { SimulationState } from "./simulation-state";
 import type { BallState } from "./ball-state";
 import {
@@ -14,7 +14,7 @@ import { solvePolynomial } from "./polynomial";
 
 export interface Event {
   time: number;
-  eventType: "BALL_COLLISION" | "RAIL_COLLISION" | "STATE_CHANGE";
+  eventType: "BALL_COLLISION" | "RAIL_COLLISION" | "STATE_CHANGE" | "POCKET";
   a: number;
   b: number | null;
 }
@@ -79,6 +79,17 @@ export function predictBallBallCollision(
   return null;
 }
 
+function isInPocketZone(pos: Vec2, pockets: Pocket[]): boolean {
+  for (const pocket of pockets) {
+    const dx = pos[0] - pocket.center[0];
+    const dy = pos[1] - pocket.center[1];
+    if (dx * dx + dy * dy <= pocket.fallRadius * pocket.fallRadius) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function predictRailCollisionPosition(
   ball: BallState,
   table: Table,
@@ -86,6 +97,7 @@ function predictRailCollisionPosition(
   const [vx, vy] = ball.vel;
   const [x, y] = ball.pos;
   const r = ball.radius;
+  const pockets = getPockets(table);
 
   const collisions: { time: number; position: Vec2 }[] = [];
 
@@ -106,7 +118,10 @@ function predictRailCollisionPosition(
     collisions.push({ time: ct, position: [x + vx * ct, r] });
   }
 
-  const valid = collisions.filter((c) => c.time > 1e-6);
+  // Filter out collisions in pocket zones
+  const valid = collisions.filter(
+    (c) => c.time > 1e-6 && !isInPocketZone(c.position, pockets),
+  );
   if (valid.length === 0) return null;
 
   valid.sort((a, b) => a.time - b.time);
@@ -130,6 +145,33 @@ export function predictStateTransition(ball: BallState): number | null {
     return timeRollingToStop(ball, G);
   }
   return null;
+}
+
+function predictPocketEntry(
+  ball: BallState,
+  table: Table,
+): { time: number; pocketIndex: number } | null {
+  const pockets = getPockets(table);
+  let earliest: { time: number; pocketIndex: number } | null = null;
+
+  for (let pi = 0; pi < pockets.length; pi++) {
+    const pocket = pockets[pi];
+    const t = timeToReachPoint(ball, pocket.center, G);
+    if (t !== null && t > 1e-6) {
+      // Check if ball will actually be within fall radius at this time
+      // Use a simple linear approximation for the check
+      const px = ball.pos[0] + ball.vel[0] * t;
+      const py = ball.pos[1] + ball.vel[1] * t;
+      const dx = px - pocket.center[0];
+      const dy = py - pocket.center[1];
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= pocket.fallRadius && (earliest === null || t < earliest.time)) {
+        earliest = { time: t, pocketIndex: pi };
+      }
+    }
+  }
+
+  return earliest;
 }
 
 export function computeNextEvent(
@@ -162,6 +204,19 @@ export function computeNextEvent(
         eventType: "RAIL_COLLISION",
         a: i,
         b: null,
+      };
+    }
+  }
+
+  // pocket entries
+  for (let i = 0; i < state.balls.length; i++) {
+    const result = predictPocketEntry(state.balls[i], table);
+    if (result && (earliest === null || state.time + result.time < earliest.time)) {
+      earliest = {
+        time: state.time + result.time,
+        eventType: "POCKET",
+        a: i,
+        b: result.pocketIndex,
       };
     }
   }

@@ -1,5 +1,5 @@
 import { BallState, MotionState } from "../ball-state";
-import { G, STANDARD_9_FOOT, BALL_RADIUS } from "../constants";
+import { G, STANDARD_9_FOOT, BALL_RADIUS, getPockets } from "../constants";
 import {
   predictBallBallCollision,
   predictRailCollision,
@@ -196,4 +196,69 @@ test("compute next event all stopped", () => {
   const b = new BallState([1.0, 0.5], [0.0, 0.0], 0.0, MotionState.STOPPED);
   const state = new SimulationState([a, b], 0.0);
   expect(computeNextEvent(state, STANDARD_9_FOOT)).toBeNull();
+});
+
+// ── pocket detection ──
+
+const TABLE = STANDARD_9_FOOT;
+const pockets = getPockets(TABLE);
+
+test("ball rolling into corner pocket is detected as pocket event", () => {
+  // Ball near top-right corner, rolling toward the pocket at (w, 0)
+  const ball = new BallState(
+    [TABLE.width - 0.2, 0.2],
+    [2.0, -2.0],
+    0.0,
+    MotionState.ROLLING,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event = computeNextEvent(state, TABLE);
+  expect(event).not.toBeNull();
+  expect(event!.eventType).toBe("POCKET");
+  expect(event!.a).toBe(0);
+});
+
+test("ball rolling into side pocket is detected as pocket event", () => {
+  // Ball near top side pocket at (w/2, 0), rolling straight toward it
+  const ball = new BallState(
+    [TABLE.width / 2, 0.3],
+    [0.0, -3.0],
+    0.0,
+    MotionState.ROLLING,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event = computeNextEvent(state, TABLE);
+  expect(event).not.toBeNull();
+  expect(event!.eventType).toBe("POCKET");
+  expect(event!.a).toBe(0);
+});
+
+test("ball rolling away from pocket does not trigger pocket event", () => {
+  // Ball in the middle of the table rolling away from all pockets
+  const ball = new BallState(
+    [TABLE.width / 2, TABLE.height / 2],
+    [-2.0, 0.0],
+    0.0,
+    MotionState.ROLLING,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event = computeNextEvent(state, TABLE);
+  expect(event).not.toBeNull();
+  // Should be state change or rail, not pocket
+  expect(event!.eventType).not.toBe("POCKET");
+});
+
+test("ball rolling along rail near pocket does not bounce off rail in pocket zone", () => {
+  // Ball heading toward corner pocket — should NOT get a rail collision
+  const ball = new BallState(
+    [TABLE.width - 0.3, BALL_RADIUS],
+    [3.0, 0.0],
+    0.0,
+    MotionState.ROLLING,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event = computeNextEvent(state, TABLE);
+  expect(event).not.toBeNull();
+  // Should be pocket, not rail collision
+  expect(event!.eventType).toBe("POCKET");
 });
