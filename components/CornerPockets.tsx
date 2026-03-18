@@ -5,30 +5,31 @@ import { POCKET_CONFIG } from "./Cushions";
 const POCKET_COLOR = "#f5f0dc";
 const INCHES_TO_M = 0.0254;
 
-export const POCKET_RADIUS_CONFIG = {
-  cornerClothRadius: 4.5,    // inches — arc at the cloth/playing side (pocket opening)
+export const CORNER_POCKET_CONFIG = {
+  clothRadius: 4.5,    // inches — arc at the cloth/playing side
 };
 
-interface PocketsProps {
+interface CornerPocketsProps {
   tableWidth: number;
   tableHeight: number;
   railThickness: number;
   cushionThickness: number;
-  scale: number; // pixels per meter
+  scale: number;
 }
 
-export default function Pockets({ tableWidth, tableHeight, railThickness, cushionThickness, scale }: PocketsProps) {
+export default function CornerPockets({ tableWidth, tableHeight, railThickness, cushionThickness, scale }: CornerPocketsProps) {
   const elements = useMemo(() => {
     const R = railThickness;
     const CT = cushionThickness;
     const cw = tableWidth + 2 * CT;
-    const cr = POCKET_RADIUS_CONFIG.cornerClothRadius * INCHES_TO_M * scale;
+    const ch = tableHeight + 2 * CT;
+
+    const cr = CORNER_POCKET_CONFIG.clothRadius * INCHES_TO_M * scale;
     const clipW = POCKET_CONFIG.cornerPocketMouth * INCHES_TO_M * scale;
     const backR = clipW / 2;
     const clipH = cr * 0.85;
 
-    const ch = tableHeight + 2 * CT;
-    const corners: { key: string; cx: number; cy: number; rot: number }[] = [
+    const pockets: { key: string; cx: number; cy: number; rot: number }[] = [
       { key: "tl", cx: R,      cy: R,      rot: -45 },
       { key: "tr", cx: R + cw, cy: R,      rot: 45 },
       { key: "bl", cx: R,      cy: R + ch, rot: -135 },
@@ -37,15 +38,15 @@ export default function Pockets({ tableWidth, tableHeight, railThickness, cushio
 
     const views: React.JSX.Element[] = [];
 
-    for (const c of corners) {
-      // Back semicircle — centered at the corner
+    for (const p of pockets) {
+      // Back semicircle
       views.push(
         <View
-          key={`${c.key}-back`}
+          key={`${p.key}-back`}
           style={{
             position: "absolute",
-            left: c.cx - backR,
-            top: c.cy - backR,
+            left: p.cx - backR,
+            top: p.cy - backR,
             width: backR * 2,
             height: backR * 2,
             borderRadius: backR,
@@ -57,17 +58,17 @@ export default function Pockets({ tableWidth, tableHeight, railThickness, cushio
       // Cloth arc — large circle clipped to mouth width
       views.push(
         <View
-          key={`${c.key}-cloth`}
+          key={`${p.key}-cloth`}
           style={{
             position: "absolute",
-            left: c.cx - clipW / 2,
-            top: c.cy,
+            left: p.cx - clipW / 2,
+            top: p.cy,
             width: clipW,
             height: clipH,
             overflow: "hidden",
             transform: [
               { translateY: -clipH / 2 },
-              { rotate: `${c.rot}deg` },
+              { rotate: `${p.rot}deg` },
               { translateY: clipH / 2 },
             ],
           }}

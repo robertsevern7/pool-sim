@@ -6,7 +6,8 @@ import { ALL_SCENARIOS } from "../engine/scenarios";
 import { useGameState } from "../hooks/useGameState";
 import Ball from "../components/Ball";
 import Cushions from "../components/Cushions";
-import Pockets from "../components/Pockets";
+import CornerPockets from "../components/CornerPockets";
+import SidePockets from "../components/SidePockets";
 import TrajectoryLine from "../components/TrajectoryLine";
 import type { Vec2 } from "../engine/physics/vec2";
 import { strings } from "../constants/strings";
@@ -109,7 +110,14 @@ export default function TableScreen() {
             },
           ]}
         />
-        <Pockets
+        <CornerPockets
+          tableWidth={tableWidth}
+          tableHeight={tableHeight}
+          railThickness={RAIL_THICKNESS}
+          cushionThickness={CUSHION_THICKNESS}
+          scale={scaleX}
+        />
+        <SidePockets
           tableWidth={tableWidth}
           tableHeight={tableHeight}
           railThickness={RAIL_THICKNESS}
