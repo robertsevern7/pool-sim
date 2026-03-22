@@ -12,26 +12,24 @@ interface PowerSliderProps {
 }
 
 export default function PowerSlider({ value, onValueChange, disabled }: PowerSliderProps) {
-  const trackRef = useRef<View>(null);
+  const callbackRef = useRef(onValueChange);
+  callbackRef.current = onValueChange;
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled,
-      onMoveShouldSetPanResponder: () => !disabled,
-      onPanResponderGrant: (e) => {
-        updateValue(e.nativeEvent.locationY);
-      },
-      onPanResponderMove: (e) => {
-        updateValue(e.nativeEvent.locationY);
-      },
+      onStartShouldSetPanResponder: () => !disabledRef.current,
+      onMoveShouldSetPanResponder: () => !disabledRef.current,
+      onPanResponderGrant: (e) => updateValue(e.nativeEvent.locationY),
+      onPanResponderMove: (e) => updateValue(e.nativeEvent.locationY),
     }),
   ).current;
 
   function updateValue(locationY: number) {
-    // Top = max power (1), bottom = min power (0.05)
     const clamped = Math.max(0, Math.min(TRACK_HEIGHT, locationY));
     const power = 1 - clamped / TRACK_HEIGHT;
-    onValueChange(Math.max(0.05, power));
+    callbackRef.current(Math.max(0.05, power));
   }
 
   const fillHeight = value * TRACK_HEIGHT;
@@ -40,7 +38,6 @@ export default function PowerSlider({ value, onValueChange, disabled }: PowerSli
   return (
     <View style={styles.container}>
       <View
-        ref={trackRef}
         style={styles.track}
         {...panResponder.panHandlers}
       >

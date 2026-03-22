@@ -36,6 +36,7 @@ type Action =
   | { type: "AIM_AT_POINT"; point: Vec2 }
   | { type: "ADJUST_ANGLE"; delta: number }
   | { type: "SET_POWER"; power: number }
+  | { type: "SET_SPIN"; spin: number }
   | { type: "SHOOT" }
   | { type: "TICK" }
   | { type: "RESET" };
@@ -181,6 +182,14 @@ function reducer(state: GameState, action: Action): GameState {
       return recomputeSimulation({ ...base, power });
     }
 
+    case "SET_SPIN": {
+      const cueSpin = Math.max(-1, Math.min(1, action.spin));
+      let base = state;
+      if (state.mode === "done") base = previewFromFinalPositions(state);
+      if (base.mode !== "preview") return state;
+      return recomputeSimulation({ ...base, cueSpin });
+    }
+
     case "SHOOT": {
       if (state.initialBalls.length === 0) return state;
 
@@ -279,6 +288,10 @@ export function useGameState(initialBalls: BallState[]) {
     (power: number) => dispatch({ type: "SET_POWER", power }),
     [],
   );
+  const setSpin = useCallback(
+    (spin: number) => dispatch({ type: "SET_SPIN", spin }),
+    [],
+  );
 
   const currentBalls =
     state.frames.length > 0 && state.frameIndex < state.frames.length
@@ -296,5 +309,7 @@ export function useGameState(initialBalls: BallState[]) {
     aimAtPoint,
     adjustAngle,
     setPower,
+    spin: state.cueSpin,
+    setSpin,
   };
 }

@@ -54,6 +54,8 @@ export default function TableScreen() {
     adjustAngle,
     power,
     setPower,
+    spin,
+    setSpin,
   } = useGameState(initialBalls);
 
   const padding = 24;
@@ -237,7 +239,7 @@ export default function TableScreen() {
         <View style={styles.controlBar}>
           {/* Bottom-left: Cue ball contact point */}
           <View style={styles.controlLeft}>
-            <CueBallControl />
+            <CueBallControl spin={spin} onSpinChange={setSpin} disabled={isPlaying} />
             <PowerSlider value={power / MAX_POWER} onValueChange={(v) => setPower(v * MAX_POWER)} disabled={isPlaying} />
           </View>
 
