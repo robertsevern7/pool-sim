@@ -18,6 +18,7 @@ const ASPECT_RATIO = TABLE_WIDTH_M / TABLE_HEIGHT_M;
 
 const RAIL_COLOR = "rgb(20, 20, 20)";
 const CLOTH_COLOR = "rgb(90, 170, 210)";
+const CLOTH_LINE_COLOR = "rgb(82, 158, 196)";
 const DIAMOND_COLOR = "rgb(240, 240, 240)";
 const RAIL_THICKNESS = 32;
 const CUSHION_THICKNESS_INCHES = POCKET_CONFIG.cushionThickness;
@@ -83,14 +84,15 @@ export default function TableScreen() {
   const d = DIAMOND_SIZE / 2;
 
   const diamonds = (cw: number, ch: number) => {
-    const sides: { key: string; fracs: number[]; pos: (f: number) => object }[] = [
-      { key: "l", fracs: LONG_RAIL_POSITIONS, pos: (f) => ({ left: rc, top: border + f * ch - d }) },
-      { key: "r", fracs: LONG_RAIL_POSITIONS, pos: (f) => ({ right: rc, top: border + f * ch - d }) },
-      { key: "t", fracs: SHORT_RAIL_POSITIONS, pos: (f) => ({ top: rc, left: border + f * cw - d }) },
-      { key: "b", fracs: SHORT_RAIL_POSITIONS, pos: (f) => ({ bottom: rc, left: border + f * cw - d }) },
+    const thin = 0.75;
+    const sides: { key: string; fracs: number[]; pos: (f: number) => object; squish: object }[] = [
+      { key: "l", fracs: LONG_RAIL_POSITIONS, pos: (f) => ({ left: rc, top: border + f * ch - d }), squish: { scaleY: thin } },
+      { key: "r", fracs: LONG_RAIL_POSITIONS, pos: (f) => ({ right: rc, top: border + f * ch - d }), squish: { scaleY: thin } },
+      { key: "t", fracs: SHORT_RAIL_POSITIONS, pos: (f) => ({ top: rc, left: border + f * cw - d }), squish: { scaleX: thin } },
+      { key: "b", fracs: SHORT_RAIL_POSITIONS, pos: (f) => ({ bottom: rc, left: border + f * cw - d }), squish: { scaleX: thin } },
     ];
-    return sides.flatMap(({ key, fracs, pos }) =>
-      fracs.map((f, i) => <View key={`${key}-${i}`} style={[styles.diamond, pos(f)]} />)
+    return sides.flatMap(({ key, fracs, pos, squish }) =>
+      fracs.map((f, i) => <View key={`${key}-${i}`} style={[styles.diamond, pos(f), { transform: [squish, { rotate: "135deg" }] }]} />)
     );
   };
 
@@ -134,6 +136,35 @@ export default function TableScreen() {
           cushionThickness={CUSHION_THICKNESS}
           scale={scaleX}
         />
+        {/* Cloth lines — long side (31 horizontal) */}
+        {Array.from({ length: 31 }, (_, i) => (
+          <View
+            key={`hl-${i}`}
+            style={{
+              position: "absolute",
+              left: border,
+              top: border + ((i + 1) * tableHeight) / 32,
+              width: tableWidth,
+              height: 1,
+              backgroundColor: CLOTH_LINE_COLOR,
+            }}
+          />
+        ))}
+        {/* Cloth lines — short side (15 vertical) */}
+        {Array.from({ length: 15 }, (_, i) => (
+          <View
+            key={`vl-${i}`}
+            style={{
+              position: "absolute",
+              left: border + ((i + 1) * tableWidth) / 16,
+              top: border,
+              width: 1,
+              height: tableHeight,
+              backgroundColor: CLOTH_LINE_COLOR,
+            }}
+          />
+        ))}
+
         <Cushions
           tableWidth={tableWidth}
           tableHeight={tableHeight}
@@ -204,7 +235,6 @@ const styles = StyleSheet.create({
     width: DIAMOND_SIZE,
     height: DIAMOND_SIZE,
     backgroundColor: DIAMOND_COLOR,
-    transform: [{ rotate: "45deg" }],
   },
   button: {
     marginTop: 16,
