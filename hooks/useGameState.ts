@@ -14,14 +14,15 @@ type Mode = "preview" | "playing" | "done";
 
 export const FINE_AIM_STEP = 0.02 * (Math.PI / 180);
 export const COARSE_AIM_STEP = 2.0 * (Math.PI / 180);
+export const MAX_POWER = 5.0; // m/s
 
 interface GameState {
   mode: Mode;
   initialBalls: BallState[];
-  cueSpeed: number;
   cueSpin: number;
+  /** Cue ball speed in m/s */
+  power: number;
   targetBallIndex: number | null;
-  /** Explicit aim direction (from tapping table), overrides target ball */
   aimDirection: Vec2 | null;
   aimAngleOffset: number;
   frames: Frame[];
@@ -34,6 +35,7 @@ type Action =
   | { type: "SET_TARGET"; ballIndex: number }
   | { type: "AIM_AT_POINT"; point: Vec2 }
   | { type: "ADJUST_ANGLE"; delta: number }
+  | { type: "SET_POWER"; power: number }
   | { type: "SHOOT" }
   | { type: "TICK" }
   | { type: "RESET" };
@@ -64,7 +66,6 @@ function buildAimedBalls(state: GameState): BallState[] {
     }
   }
 
-  // Apply angle offset (rotate direction)
   const cos = Math.cos(state.aimAngleOffset);
   const sin = Math.sin(state.aimAngleOffset);
   const rotated: Vec2 = [
@@ -72,7 +73,7 @@ function buildAimedBalls(state: GameState): BallState[] {
     dir[0] * sin + dir[1] * cos,
   ];
 
-  const newCue = cueStrike(cueBall.pos, rotated, state.cueSpeed, state.cueSpin);
+  const newCue = cueStrike(cueBall.pos, rotated, state.power, state.cueSpin);
   return [newCue, ...state.initialBalls.slice(1)];
 }
 
@@ -102,8 +103,8 @@ function previewFromFinalPositions(state: GameState): GameState {
   return {
     mode: "preview",
     initialBalls: newBalls,
-    cueSpeed: state.cueSpeed,
     cueSpin: state.cueSpin,
+    power: state.power,
     targetBallIndex: newBalls.length > 1 ? 1 : null,
     aimDirection: null,
     aimAngleOffset: 0,
@@ -122,8 +123,8 @@ function reducer(state: GameState, action: Action): GameState {
       return {
         mode: "preview",
         initialBalls: action.balls,
-        cueSpeed: speed,
         cueSpin: spin,
+        power: speed,
         targetBallIndex: null,
         aimDirection: null,
         aimAngleOffset: 0,
@@ -172,6 +173,14 @@ function reducer(state: GameState, action: Action): GameState {
       });
     }
 
+    case "SET_POWER": {
+      const power = Math.max(0.1, Math.min(MAX_POWER, action.power));
+      let base = state;
+      if (state.mode === "done") base = previewFromFinalPositions(state);
+      if (base.mode !== "preview") return state;
+      return recomputeSimulation({ ...base, power });
+    }
+
     case "SHOOT": {
       if (state.initialBalls.length === 0) return state;
 
@@ -206,8 +215,8 @@ function reducer(state: GameState, action: Action): GameState {
 const INITIAL_STATE: GameState = {
   mode: "preview",
   initialBalls: [],
-  cueSpeed: 0,
   cueSpin: 0,
+  power: 2.5,
   targetBallIndex: null,
   aimDirection: null,
   aimAngleOffset: 0,
@@ -266,6 +275,10 @@ export function useGameState(initialBalls: BallState[]) {
     (delta: number) => dispatch({ type: "ADJUST_ANGLE", delta }),
     [],
   );
+  const setPower = useCallback(
+    (power: number) => dispatch({ type: "SET_POWER", power }),
+    [],
+  );
 
   const currentBalls =
     state.frames.length > 0 && state.frameIndex < state.frames.length
@@ -277,9 +290,11 @@ export function useGameState(initialBalls: BallState[]) {
     balls: currentBalls,
     trajectories: state.trajectories,
     targetBallIndex: state.targetBallIndex,
+    power: state.power,
     shoot,
     setTarget,
     aimAtPoint,
     adjustAngle,
+    setPower,
   };
 }

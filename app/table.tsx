@@ -3,14 +3,15 @@ import { useLocalSearchParams } from "expo-router";
 import { useMemo, useCallback, useRef } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import { ALL_SCENARIOS } from "../engine/scenarios";
-import { useGameState, FINE_AIM_STEP, COARSE_AIM_STEP } from "../hooks/useGameState";
+import { useGameState, FINE_AIM_STEP, COARSE_AIM_STEP, MAX_POWER } from "../hooks/useGameState";
 import Ball from "../components/Ball";
 import Cushions from "../components/Cushions";
 import CornerPockets from "../components/CornerPockets";
 import SidePockets from "../components/SidePockets";
 import TrajectoryLine from "../components/TrajectoryLine";
 import CueBallControl from "../components/CueBallControl";
-import type { Vec2 } from "../engine/physics/vec2";
+import PowerSlider from "../components/PowerSlider";
+import { Vec2 } from "../engine/physics/vec2";
 import { strings } from "../constants/strings";
 
 const TABLE_WIDTH_M = STANDARD_9_FOOT.width;
@@ -30,7 +31,7 @@ const LONG_RAIL_POSITIONS = [1, 2, 3, 5, 6, 7].map((i) => (i * SEGMENT) / TABLE_
 const SHORT_RAIL_POSITIONS = [1, 2, 3].map((i) => (i * SEGMENT) / TABLE_HEIGHT_M);
 const DIAMOND_SIZE = 8;
 
-const CONTROLS_HEIGHT = 90;
+const CONTROLS_HEIGHT = 150;
 
 export default function TableScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -51,6 +52,8 @@ export default function TableScreen() {
     setTarget,
     aimAtPoint,
     adjustAngle,
+    power,
+    setPower,
   } = useGameState(initialBalls);
 
   const padding = 24;
@@ -235,6 +238,7 @@ export default function TableScreen() {
           {/* Bottom-left: Cue ball contact point */}
           <View style={styles.controlLeft}>
             <CueBallControl />
+            <PowerSlider value={power / MAX_POWER} onValueChange={(v) => setPower(v * MAX_POWER)} disabled={isPlaying} />
           </View>
 
           {/* Center: Shoot */}
@@ -327,8 +331,9 @@ const styles = StyleSheet.create({
   },
   controlLeft: {
     flex: 1,
-    alignItems: "flex-start",
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   controlRight: {
     flex: 1,
