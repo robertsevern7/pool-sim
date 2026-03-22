@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMemo, useCallback } from "react";
-import { STANDARD_9_FOOT, BALL_RADIUS } from "../engine/physics/constants";
+import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import { ALL_SCENARIOS } from "../engine/scenarios";
 import { useGameState } from "../hooks/useGameState";
 import Ball from "../components/Ball";
@@ -20,7 +20,8 @@ const RAIL_COLOR = "rgb(20, 20, 20)";
 const CLOTH_COLOR = "rgb(90, 170, 210)";
 const DIAMOND_COLOR = "rgb(240, 240, 240)";
 const RAIL_THICKNESS = 32;
-const CUSHION_THICKNESS = 14;
+const CUSHION_THICKNESS_INCHES = POCKET_CONFIG.cushionThickness;
+const INCHES_TO_M = 0.0254;
 
 const SEGMENT = TABLE_HEIGHT_M / 4;
 const LONG_RAIL_POSITIONS = [1, 2, 3, 5, 6, 7].map((i) => (i * SEGMENT) / TABLE_WIDTH_M);
@@ -42,23 +43,32 @@ export default function TableScreen() {
 
   const padding = 24;
   const buttonHeight = scenarioId ? 60 : 0;
-  const border = RAIL_THICKNESS + CUSHION_THICKNESS;
-  const maxWidth = screenWidth - padding * 2 - border * 2;
-  const maxHeight = screenHeight - padding * 2 - border * 2 - buttonHeight;
+
+  // Cushion thickness in pixels depends on scale, and scale depends on tableWidth.
+  // Solve: tableWidth * (1 + 2k) = availableSpace, where k = CT_m / TABLE_HEIGHT_M
+  const CT_M = CUSHION_THICKNESS_INCHES * INCHES_TO_M;
+  const k = CT_M / TABLE_HEIGHT_M;
+  const availW = screenWidth - padding * 2 - RAIL_THICKNESS * 2;
+  const availH = screenHeight - padding * 2 - RAIL_THICKNESS * 2 - buttonHeight;
+
+  const maxTableW = availW / (1 + 2 * k);
+  const maxTableH = availH / (1 + 2 * k * ASPECT_RATIO);
 
   let tableWidth: number;
   let tableHeight: number;
 
-  if (maxWidth * ASPECT_RATIO <= maxHeight) {
-    tableWidth = maxWidth;
-    tableHeight = maxWidth * ASPECT_RATIO;
+  if (maxTableW * ASPECT_RATIO <= maxTableH) {
+    tableWidth = maxTableW;
+    tableHeight = maxTableW * ASPECT_RATIO;
   } else {
-    tableHeight = maxHeight;
-    tableWidth = maxHeight / ASPECT_RATIO;
+    tableHeight = maxTableH;
+    tableWidth = maxTableH / ASPECT_RATIO;
   }
 
   const scaleX = tableWidth / TABLE_HEIGHT_M;
   const scaleY = tableHeight / TABLE_WIDTH_M;
+  const CUSHION_THICKNESS = CT_M * scaleX;
+  const border = RAIL_THICKNESS + CUSHION_THICKNESS;
   const ballRadius = BALL_RADIUS * scaleX;
 
   const toScreen = useCallback(
@@ -141,6 +151,8 @@ export default function TableScreen() {
             isCue={i === 0}
           />
         ))}
+
+
 
         {balls.map((ball, i) => (
           <Ball

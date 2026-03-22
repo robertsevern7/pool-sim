@@ -1,10 +1,8 @@
 import { View } from "react-native";
 import { useMemo } from "react";
-import { POCKET_CONFIG } from "../engine/physics/constants";
+import { getPockets, STANDARD_9_FOOT, POCKET_CONFIG, type Pocket } from "../engine/physics/constants";
 
 const POCKET_COLOR = "#f5f0dc";
-const INCHES_TO_M = 0.0254;
-
 
 interface SidePocketsProps {
   tableWidth: number;
@@ -20,36 +18,31 @@ export default function SidePockets({ tableWidth, tableHeight, railThickness, cu
     const CT = cushionThickness;
     const cw = tableWidth + 2 * CT;
     const ch = tableHeight + 2 * CT;
-
-    const cr = POCKET_CONFIG.sideClothRadius * INCHES_TO_M * scale;
-    const sm = (POCKET_CONFIG.sidePocketMouth / 2) * INCHES_TO_M * scale;
-    const scd = POCKET_CONFIG.sideAngle >= 90 ? 0 : CT / Math.tan((POCKET_CONFIG.sideAngle * Math.PI) / 180);
-
-    // Back points are at the nose tips: ±(sm - scd) from center
-    const backPt = sm - scd;
-    const backR = backPt;
-
-    // Arc passes through back points at ±backPt from center
-    const arcSetback = Math.sqrt(cr * cr - backPt * backPt);
-    // How far the arc protrudes past the back points line
-    const sagitta = cr - arcSetback;
-
-    const pockets: { key: string; cx: number; cy: number; dx: number }[] = [
-      { key: "sl", cx: R,      cy: R + ch / 2, dx: -1 },
-      { key: "sr", cx: R + cw, cy: R + ch / 2, dx: 1 },
-    ];
+    const pockets = getPockets(STANDARD_9_FOOT).filter((p) => p.type === "side");
 
     const views: React.JSX.Element[] = [];
 
-    for (const p of pockets) {
+    const screenPositions: { key: string; pocket: Pocket; cx: number; cy: number; dx: number }[] = [
+      { key: "sl", pocket: pockets[0], cx: R,      cy: R + ch / 2, dx: -1 },
+      { key: "sr", pocket: pockets[1], cx: R + cw, cy: R + ch / 2, dx: 1 },
+    ];
+
+    for (const s of screenPositions) {
+      const cr = s.pocket.fallRadius * scale;
+      const backR = s.pocket.backRadius * scale;
+      const backPt = backR;
+      const arcSetback = Math.sqrt(cr * cr - backPt * backPt);
+      const sagitta = cr - arcSetback;
+
       // Back semicircle — clip to only show the half facing the playing surface
+      const oneInch = 0.0254 * scale;
       views.push(
         <View
-          key={`${p.key}-back`}
+          key={`${s.key}-back`}
           style={{
             position: "absolute",
-            left: p.dx === -1 ? p.cx - backR - 1 * INCHES_TO_M * scale : p.cx + 1 * INCHES_TO_M * scale,
-            top: p.cy - backR,
+            left: s.dx === -1 ? s.cx - backR - oneInch : s.cx + oneInch,
+            top: s.cy - backR,
             width: backR,
             height: backR * 2,
             overflow: "hidden",
@@ -58,7 +51,7 @@ export default function SidePockets({ tableWidth, tableHeight, railThickness, cu
           <View
             style={{
               position: "absolute",
-              left: p.dx === -1 ? 0 : -backR,
+              left: s.dx === -1 ? 0 : -backR,
               top: 0,
               width: backR * 2,
               height: backR * 2,
@@ -70,17 +63,17 @@ export default function SidePockets({ tableWidth, tableHeight, railThickness, cu
       );
 
       // Rectangle filling gap between cloth arc and back semicircle
-      const arcX = p.cx - p.dx * (0.5 * INCHES_TO_M * scale);
-      const oneInch = 1 * INCHES_TO_M * scale;
-      const fillLeft = p.dx === -1 ? p.cx - oneInch : arcX;
-      const fillRight = p.dx === -1 ? arcX : p.cx + oneInch;
+      const inset = POCKET_CONFIG.sidePocketInset * 0.0254 * scale;
+      const arcX = s.cx - s.dx * inset;
+      const fillLeft = s.dx === -1 ? s.cx - oneInch : arcX;
+      const fillRight = s.dx === -1 ? arcX : s.cx + oneInch;
       views.push(
         <View
-          key={`${p.key}-fill`}
+          key={`${s.key}-fill`}
           style={{
             position: "absolute",
             left: fillLeft,
-            top: p.cy - backPt,
+            top: s.cy - backPt,
             width: fillRight - fillLeft,
             height: backPt * 2,
             backgroundColor: POCKET_COLOR,
@@ -89,14 +82,14 @@ export default function SidePockets({ tableWidth, tableHeight, railThickness, cu
       );
 
       // Cloth arc — rotated 90° so the clip aligns perpendicular to the rail
-      const rot = p.dx === -1 ? -90 : 90;
+      const rot = s.dx === -1 ? -90 : 90;
       views.push(
         <View
-          key={`${p.key}-cloth`}
+          key={`${s.key}-cloth`}
           style={{
             position: "absolute",
-            left: p.cx - p.dx * (0.5 * INCHES_TO_M * scale) - backPt,
-            top: p.cy,
+            left: s.cx - s.dx * inset - backPt,
+            top: s.cy,
             width: backPt * 2,
             height: sagitta,
             overflow: "hidden",

@@ -153,6 +153,54 @@ export function timeToReachPoint(
   return t;
 }
 
+/**
+ * Time for a ball to travel a given distance along its current velocity direction.
+ * Unlike timeToReachPoint, this doesn't project onto ball→target direction,
+ * so it works correctly for off-axis targets.
+ */
+export function timeToTravelDistance(
+  ball: BallState,
+  distance: number,
+  g: number,
+): number | null {
+  const speed = norm(ball.vel);
+  if (speed <= 0) return null;
+  if (distance <= 0) return 0;
+
+  let a: number;
+  let tMax: number;
+
+  if (ball.motion === MotionState.SLIDING) {
+    a = ball.mu()! * g;
+    tMax = timeSlidingToRolling(ball, g);
+  } else if (ball.motion === MotionState.ROLLING) {
+    a = ball.mu()! * g;
+    tMax = timeRollingToStop(ball, g);
+  } else {
+    return null;
+  }
+
+  // Solve: distance = speed*t - 0.5*a*t²  →  0.5*a*t² - speed*t + distance = 0
+  const A = 0.5 * a;
+  const B = -speed;
+  const C = distance;
+
+  const discriminant = B * B - 4 * A * C;
+  if (discriminant < 0) return null;
+
+  const sqrtDisc = Math.sqrt(discriminant);
+  const t1 = (-B + sqrtDisc) / (2 * A);
+  const t2 = (-B - sqrtDisc) / (2 * A);
+
+  const candidates = [t1, t2].filter((t) => t >= 0);
+  if (candidates.length === 0) return null;
+
+  const t = Math.min(...candidates);
+  if (t > tMax) return null;
+
+  return t;
+}
+
 export function timeSlidingToRolling(ball: BallState, g: number): number {
   const v0 = norm(ball.vel);
   if (v0 === 0) {

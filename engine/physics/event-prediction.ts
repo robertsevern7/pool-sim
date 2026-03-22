@@ -1,5 +1,5 @@
 import { MotionState } from "./ball-state";
-import { G, getPockets } from "./constants";
+import { G, BALL_RADIUS, getPockets } from "./constants";
 import type { Table, Pocket } from "./constants";
 import type { SimulationState } from "./simulation-state";
 import type { BallState } from "./ball-state";
@@ -8,6 +8,7 @@ import {
   timeRollingToStop,
   timeSlidingToRolling,
   timeToReachPoint,
+  timeToTravelDistance,
 } from "./motion-models";
 import { sub, scale, dot, norm, Vec2 } from "./vec2";
 import { solvePolynomial } from "./polynomial";
@@ -79,12 +80,28 @@ export function predictBallBallCollision(
   return null;
 }
 
-function isInPocketZone(pos: Vec2, pockets: Pocket[]): boolean {
+// Check if a rail collision position falls within a pocket mouth gap (no cushion there)
+export function isInPocketGap(pos: Vec2, table: Table, pockets: Pocket[]): boolean {
+  const r = BALL_RADIUS;
+  const h = table.height;
+
   for (const pocket of pockets) {
-    const dx = pos[0] - pocket.center[0];
-    const dy = pos[1] - pocket.center[1];
-    if (dx * dx + dy * dy <= pocket.fallRadius * pocket.fallRadius) {
-      return true;
+    const halfMouth = pocket.mouthWidth / 2;
+    const [cx, cy] = pocket.center;
+
+    if (pocket.type === "side") {
+      // Side pockets: gap along the x-axis at y=0 or y=h
+      // Ball hits rail at y=r or y=h-r; check if x is within mouth
+      if (Math.abs(pos[0] - cx) <= halfMouth) {
+        if (cy === 0 && pos[1] <= r + 0.01) return true;
+        if (cy === h && pos[1] >= h - r - 0.01) return true;
+      }
+    } else {
+      // Corner pockets: gap near the corner on both adjacent rails
+      // Check if position is within mouthWidth of the corner along either axis
+      if (Math.abs(pos[0] - cx) <= pocket.mouthWidth && Math.abs(pos[1] - cy) <= pocket.mouthWidth) {
+        return true;
+      }
     }
   }
   return false;
@@ -97,30 +114,53 @@ function predictRailCollisionPosition(
   const [vx, vy] = ball.vel;
   const [x, y] = ball.pos;
   const r = ball.radius;
+  const a = ballAcceleration(ball, G);
   const pockets = getPockets(table);
 
+  // Solve for time to reach each rail boundary using exact kinematics:
+  // pos(t) = pos + vel*t + 0.5*a*t²
+  // For x-boundary: x + vx*t + 0.5*ax*t² = boundary → 0.5*ax*t² + vx*t + (x - boundary) = 0
   const collisions: { time: number; position: Vec2 }[] = [];
 
-  if (vx > 0) {
-    const ct = (table.width - r - x) / vx;
-    collisions.push({ time: ct, position: [table.width - r, y + vy * ct] });
-  }
-  if (vx < 0) {
-    const ct = (r - x) / vx;
-    collisions.push({ time: ct, position: [r, y + vy * ct] });
-  }
-  if (vy > 0) {
-    const ct = (table.height - r - y) / vy;
-    collisions.push({ time: ct, position: [x + vx * ct, table.height - r] });
-  }
-  if (vy < 0) {
-    const ct = (r - y) / vy;
-    collisions.push({ time: ct, position: [x + vx * ct, r] });
+  const boundaries: { axis: 0 | 1; value: number }[] = [];
+  if (vx > 0 || a[0] > 0) boundaries.push({ axis: 0, value: table.width - r });
+  if (vx < 0 || a[0] < 0) boundaries.push({ axis: 0, value: r });
+  if (vy > 0 || a[1] > 0) boundaries.push({ axis: 1, value: table.height - r });
+  if (vy < 0 || a[1] < 0) boundaries.push({ axis: 1, value: r });
+
+  for (const b of boundaries) {
+    const p0 = ball.pos[b.axis];
+    const v0 = ball.vel[b.axis];
+    const a0 = a[b.axis];
+    // 0.5*a0*t² + v0*t + (p0 - b.value) = 0
+    const coeffA = 0.5 * a0;
+    const coeffB = v0;
+    const coeffC = p0 - b.value;
+
+    let roots: number[];
+    if (Math.abs(coeffA) < 1e-12) {
+      // Linear: v0*t + (p0 - b.value) = 0
+      if (Math.abs(coeffB) < 1e-12) continue;
+      roots = [-coeffC / coeffB];
+    } else {
+      const disc = coeffB * coeffB - 4 * coeffA * coeffC;
+      if (disc < 0) continue;
+      const sqrtDisc = Math.sqrt(disc);
+      roots = [(-coeffB + sqrtDisc) / (2 * coeffA), (-coeffB - sqrtDisc) / (2 * coeffA)];
+    }
+
+    for (const t of roots) {
+      if (t <= 1e-6) continue;
+      // Compute exact position at time t
+      const px = x + vx * t + 0.5 * a[0] * t * t;
+      const py = y + vy * t + 0.5 * a[1] * t * t;
+      collisions.push({ time: t, position: [px, py] });
+    }
   }
 
   // Filter out collisions in pocket zones
   const valid = collisions.filter(
-    (c) => c.time > 1e-6 && !isInPocketZone(c.position, pockets),
+    (c) => c.time > 1e-6 && !isInPocketGap(c.position, table, pockets),
   );
   if (valid.length === 0) return null;
 
@@ -147,25 +187,67 @@ export function predictStateTransition(ball: BallState): number | null {
   return null;
 }
 
+// Line-circle intersection: find where the ball's trajectory ray crosses the pocket's fall circle.
+// Returns the intersection point closest to the cloth (playing surface), or null.
+export function linePocketIntersection(
+  ballPos: Vec2,
+  ballDir: Vec2,
+  pocket: Pocket,
+): Vec2 | null {
+  const cx = pocket.fallCenter[0];
+  const cy = pocket.fallCenter[1];
+  const r = pocket.fallRadius;
+
+  // Ray: P(t) = ballPos + ballDir * t, t >= 0
+  const ex = ballPos[0] - cx;
+  const ey = ballPos[1] - cy;
+  const dx = ballDir[0];
+  const dy = ballDir[1];
+
+  const a = dx * dx + dy * dy;
+  const b = 2 * (ex * dx + ey * dy);
+  const c = ex * ex + ey * ey - r * r;
+
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return null;
+
+  const sqrtDisc = Math.sqrt(disc);
+  const t1 = (-b - sqrtDisc) / (2 * a);
+  const t2 = (-b + sqrtDisc) / (2 * a);
+
+  // Return the first intersection ahead of the ball (smallest positive t = entry point)
+  if (t1 > 1e-6) return [ballPos[0] + dx * t1, ballPos[1] + dy * t1];
+  if (t2 > 1e-6) return [ballPos[0] + dx * t2, ballPos[1] + dy * t2];
+  return null;
+}
+
 function predictPocketEntry(
   ball: BallState,
   table: Table,
 ): { time: number; pocketIndex: number } | null {
+  if (ball.motion === MotionState.STOPPED) return null;
+
+  const speed = norm(ball.vel);
+  if (speed < 1e-9) return null;
+
+  const dir: Vec2 = [ball.vel[0] / speed, ball.vel[1] / speed];
   const pockets = getPockets(table);
   let earliest: { time: number; pocketIndex: number } | null = null;
 
   for (let pi = 0; pi < pockets.length; pi++) {
     const pocket = pockets[pi];
-    const t = timeToReachPoint(ball, pocket.center, G);
+    const hitPoint = linePocketIntersection(ball.pos, dir, pocket);
+    if (hitPoint === null) continue;
+
+    // Distance from ball center to the intersection point on the fall circle
+    const dx = hitPoint[0] - ball.pos[0];
+    const dy = hitPoint[1] - ball.pos[1];
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= 0) continue;
+
+    const t = timeToTravelDistance(ball, dist, G);
     if (t !== null && t > 1e-6) {
-      // Check if ball will actually be within fall radius at this time
-      // Use a simple linear approximation for the check
-      const px = ball.pos[0] + ball.vel[0] * t;
-      const py = ball.pos[1] + ball.vel[1] * t;
-      const dx = px - pocket.center[0];
-      const dy = py - pocket.center[1];
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist <= pocket.fallRadius && (earliest === null || t < earliest.time)) {
+      if (earliest === null || t < earliest.time) {
         earliest = { time: t, pocketIndex: pi };
       }
     }

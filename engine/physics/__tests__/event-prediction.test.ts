@@ -5,6 +5,8 @@ import {
   predictRailCollision,
   predictStateTransition,
   computeNextEvent,
+  linePocketIntersection,
+  isInPocketGap,
 } from "../event-prediction";
 import { cueStrike, slidingMotion } from "../motion-models";
 import { SimulationState } from "../simulation-state";
@@ -249,10 +251,10 @@ test("ball rolling away from pocket does not trigger pocket event", () => {
 });
 
 test("ball rolling along rail near pocket does not bounce off rail in pocket zone", () => {
-  // Ball heading toward corner pocket — should NOT get a rail collision
+  // Ball heading toward corner pocket at speed — should NOT get a rail collision
   const ball = new BallState(
     [TABLE.width - 0.3, BALL_RADIUS],
-    [3.0, 0.0],
+    [5.0, 0.0],
     0.0,
     MotionState.ROLLING,
   );
@@ -261,4 +263,223 @@ test("ball rolling along rail near pocket does not bounce off rail in pocket zon
   expect(event).not.toBeNull();
   // Should be pocket, not rail collision
   expect(event!.eventType).toBe("POCKET");
+});
+
+// ── linePocketIntersection ──
+
+test("linePocketIntersection returns point on the fall radius circle", () => {
+  const pockets = getPockets(TABLE);
+
+  // Side pocket at (w/2, -arcSetback) with fallRadius = sideCr
+  const sidePocket = pockets[4]; // first side pocket
+
+  // Ball heading straight toward the side pocket
+  const ballPos: [number, number] = [TABLE.width / 2, 0.5];
+  const dir: [number, number] = [0, -1];
+
+  const hit = linePocketIntersection(ballPos, dir, sidePocket);
+  expect(hit).not.toBeNull();
+
+  // Verify the hit point lies on the fall radius circle
+  const dx = hit![0] - sidePocket.fallCenter[0];
+  const dy = hit![1] - sidePocket.fallCenter[1];
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  expect(dist).toBeCloseTo(sidePocket.fallRadius, 6);
+});
+
+test("linePocketIntersection returns point closest to cloth", () => {
+  const pockets = getPockets(TABLE);
+  const sidePocket = pockets[4];
+
+  const ballPos: [number, number] = [TABLE.width / 2, 0.5];
+  const dir: [number, number] = [0, -1];
+
+  const hit = linePocketIntersection(ballPos, dir, sidePocket);
+  expect(hit).not.toBeNull();
+
+  // The entry point is behind the rail (y < 0) where the rendered cloth arc is
+  // It should be closer to y=0 than the fall center (i.e., the near side of the circle)
+  expect(hit![1]).toBeGreaterThan(sidePocket.fallCenter[1]);
+});
+
+test("linePocketIntersection corner pocket returns point on fall circle", () => {
+  const pockets = getPockets(TABLE);
+  const cornerPocket = pockets[1]; // top-right corner at (w, 0)
+
+  // Ball heading toward the corner
+  const ballPos: [number, number] = [TABLE.width - 0.3, 0.3];
+  const dir: [number, number] = [1 / Math.SQRT2, -1 / Math.SQRT2];
+
+  const hit = linePocketIntersection(ballPos, dir, cornerPocket);
+  expect(hit).not.toBeNull();
+
+  const dx = hit![0] - cornerPocket.fallCenter[0];
+  const dy = hit![1] - cornerPocket.fallCenter[1];
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  expect(dist).toBeCloseTo(cornerPocket.fallRadius, 6);
+});
+
+test("linePocketIntersection returns null when ray misses pocket", () => {
+  const pockets = getPockets(TABLE);
+  const sidePocket = pockets[4];
+
+  // Ball heading parallel to the rail, not toward the pocket
+  const ballPos: [number, number] = [0.5, 0.5];
+  const dir: [number, number] = [1, 0];
+
+  const hit = linePocketIntersection(ballPos, dir, sidePocket);
+  expect(hit).toBeNull();
+});
+
+// Basic line-circle intersection tests with simple geometry
+describe("linePocketIntersection basic geometry", () => {
+  const unitCircle = { type: "side" as const, center: [0, 0] as [number, number], fallCenter: [0, 0] as [number, number], fallRadius: 1, zoneRadius: 2, mouthWidth: 1, backRadius: 0.5 };
+
+  test("ray along +x axis hits unit circle entry at (-1, 0)", () => {
+    const hit = linePocketIntersection([-5, 0], [1, 0], unitCircle);
+    expect(hit).not.toBeNull();
+    expect(hit![0]).toBeCloseTo(-1, 10);
+    expect(hit![1]).toBeCloseTo(0, 10);
+  });
+
+  test("ray along -x axis hits unit circle entry at (1, 0)", () => {
+    const hit = linePocketIntersection([5, 0], [-1, 0], unitCircle);
+    expect(hit).not.toBeNull();
+    expect(hit![0]).toBeCloseTo(1, 10);
+    expect(hit![1]).toBeCloseTo(0, 10);
+  });
+
+  test("ray along +y axis hits unit circle entry at (0, -1)", () => {
+    const hit = linePocketIntersection([0, -5], [0, 1], unitCircle);
+    expect(hit).not.toBeNull();
+    expect(hit![0]).toBeCloseTo(0, 10);
+    expect(hit![1]).toBeCloseTo(-1, 10);
+  });
+
+  test("ray along -y axis hits unit circle entry at (0, 1)", () => {
+    const hit = linePocketIntersection([0, 5], [0, -1], unitCircle);
+    expect(hit).not.toBeNull();
+    expect(hit![0]).toBeCloseTo(0, 10);
+    expect(hit![1]).toBeCloseTo(1, 10);
+  });
+
+  test("ray that misses returns null", () => {
+    const hit = linePocketIntersection([0, 5], [1, 0], unitCircle);
+    expect(hit).toBeNull();
+  });
+
+  test("ray at 45° hits unit circle entry at (√2/2, √2/2)", () => {
+    const dir = [1 / Math.SQRT2, 1 / Math.SQRT2] as [number, number];
+    const hit = linePocketIntersection([-5, -5], dir, unitCircle);
+    expect(hit).not.toBeNull();
+    expect(hit![0]).toBeCloseTo(-Math.SQRT2 / 2, 10);
+    expect(hit![1]).toBeCloseTo(-Math.SQRT2 / 2, 10);
+  });
+
+  test("ray returns entry point (first hit), not exit", () => {
+    const hit = linePocketIntersection([-5, 0], [1, 0], unitCircle);
+    expect(hit).not.toBeNull();
+    expect(hit![0]).toBeCloseTo(-1, 10);
+    expect(hit![1]).toBeCloseTo(0, 10);
+  });
+
+  test("ball moving away from pocket returns null", () => {
+    const hit = linePocketIntersection([5, 0], [1, 0], unitCircle);
+    expect(hit).toBeNull();
+  });
+
+  test("ray missing pocket returns null", () => {
+    const hit = linePocketIntersection([0, 5], [1, 0], unitCircle);
+    expect(hit).toBeNull();
+  });
+});
+
+// --- isInPocketGap ---
+
+describe("isInPocketGap", () => {
+  const pockets = getPockets(TABLE);
+
+  test("ball at top side pocket gap is detected", () => {
+    // Ball at center of top rail, at rail collision position
+    const pos: [number, number] = [TABLE.width / 2, BALL_RADIUS];
+    expect(isInPocketGap(pos, TABLE, pockets)).toBe(true);
+  });
+
+  test("ball at bottom side pocket gap is detected", () => {
+    const pos: [number, number] = [TABLE.width / 2, TABLE.height - BALL_RADIUS];
+    expect(isInPocketGap(pos, TABLE, pockets)).toBe(true);
+  });
+
+  test("ball outside side pocket gap is not detected", () => {
+    // Ball at rail but away from pocket center
+    const pos: [number, number] = [0.5, BALL_RADIUS];
+    expect(isInPocketGap(pos, TABLE, pockets)).toBe(false);
+  });
+
+  test("ball at corner pocket gap is detected", () => {
+    // Near top-left corner
+    const pos: [number, number] = [BALL_RADIUS, BALL_RADIUS];
+    expect(isInPocketGap(pos, TABLE, pockets)).toBe(true);
+  });
+
+  test("ball at corner pocket gap on opposite corner is detected", () => {
+    // Near bottom-right corner
+    const pos: [number, number] = [TABLE.width - BALL_RADIUS, TABLE.height - BALL_RADIUS];
+    expect(isInPocketGap(pos, TABLE, pockets)).toBe(true);
+  });
+
+  test("ball mid-rail is not in any pocket gap", () => {
+    const pos: [number, number] = [TABLE.width / 4, BALL_RADIUS];
+    expect(isInPocketGap(pos, TABLE, pockets)).toBe(false);
+  });
+});
+
+// --- getPockets ---
+
+describe("getPockets", () => {
+  const pockets = getPockets(TABLE);
+
+  test("returns 6 pockets", () => {
+    expect(pockets).toHaveLength(6);
+  });
+
+  test("4 corner pockets and 2 side pockets", () => {
+    expect(pockets.filter(p => p.type === "corner")).toHaveLength(4);
+    expect(pockets.filter(p => p.type === "side")).toHaveLength(2);
+  });
+
+  test("all fallRadius values are positive", () => {
+    for (const p of pockets) {
+      expect(p.fallRadius).toBeGreaterThan(0);
+    }
+  });
+
+  test("all mouthWidth values are positive", () => {
+    for (const p of pockets) {
+      expect(p.mouthWidth).toBeGreaterThan(0);
+    }
+  });
+
+  test("all backRadius values are positive", () => {
+    for (const p of pockets) {
+      expect(p.backRadius).toBeGreaterThan(0);
+    }
+  });
+
+  test("side pocket fallCenter is behind the rail", () => {
+    const sidePockets = pockets.filter(p => p.type === "side");
+    // Top rail pocket: fallCenter y should be negative
+    expect(sidePockets[0].fallCenter[1]).toBeLessThan(0);
+    // Bottom rail pocket: fallCenter y should be beyond table height
+    expect(sidePockets[1].fallCenter[1]).toBeGreaterThan(TABLE.height);
+  });
+
+  test("corner pocket fallCenter is offset from corner", () => {
+    // Top-left corner: both x and y should be negative
+    expect(pockets[0].fallCenter[0]).toBeLessThan(0);
+    expect(pockets[0].fallCenter[1]).toBeLessThan(0);
+    // Bottom-right corner: both beyond table dimensions
+    expect(pockets[3].fallCenter[0]).toBeGreaterThan(TABLE.width);
+    expect(pockets[3].fallCenter[1]).toBeGreaterThan(TABLE.height);
+  });
 });

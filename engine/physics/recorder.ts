@@ -76,6 +76,10 @@ export function recordTrajectories(
     { pos: [b.pos[0], b.pos[1]] as Vec2, ghost: false },
   ]);
 
+  // Maps current state.balls index → original trajectory index
+  const ballIndexMap: number[] = balls.map((_, i) => i);
+  const pottedIndices = new Set<number>();
+
   for (let step = 0; step < maxEvents; step++) {
     const event = computeNextEvent(state, table);
     if (event === null) break;
@@ -88,26 +92,41 @@ export function recordTrajectories(
 
     if (isCollision) {
       // Record waypoint for ball A
-      trajectories[event.a].push({
+      trajectories[ballIndexMap[event.a]].push({
         pos: [state.balls[event.a].pos[0], state.balls[event.a].pos[1]],
         ghost: true,
       });
       // Record waypoint for ball B (ball-ball only)
       if (event.b !== null) {
-        trajectories[event.b].push({
+        trajectories[ballIndexMap[event.b]].push({
           pos: [state.balls[event.b].pos[0], state.balls[event.b].pos[1]],
           ghost: true,
         });
       }
     }
 
+    if (event.eventType === "POCKET") {
+      // Record the pot position as a final ghost before the ball is removed
+      trajectories[ballIndexMap[event.a]].push({
+        pos: [state.balls[event.a].pos[0], state.balls[event.a].pos[1]],
+        ghost: true,
+      });
+      pottedIndices.add(ballIndexMap[event.a]);
+    }
+
     resolveEvent(state, event, table);
+
+    // After a pocket event, the ball array shifts — update the index map
+    if (event.eventType === "POCKET") {
+      ballIndexMap.splice(event.a, 1);
+    }
   }
 
-  // Add final resting positions
+  // Add final resting positions for non-potted balls
   for (let i = 0; i < state.balls.length; i++) {
+    const origIdx = ballIndexMap[i];
     const b = state.balls[i];
-    const t = trajectories[i];
+    const t = trajectories[origIdx];
     const last = t[t.length - 1];
     if (last.pos[0] !== b.pos[0] || last.pos[1] !== b.pos[1]) {
       t.push({ pos: [b.pos[0], b.pos[1]], ghost: true });

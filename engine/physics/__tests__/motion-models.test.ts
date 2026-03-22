@@ -8,6 +8,7 @@ import {
   timeRollingToStop,
   timeSlidingToRolling,
   timeToReachPoint,
+  timeToTravelDistance,
 } from "../motion-models";
 import { norm } from "../vec2";
 
@@ -424,4 +425,55 @@ test("time to reach point position at time equals target", () => {
   const { pos } = slidingMotion(ball, t, G);
   expect(q3(pos[0])).toBe(q3(target[0]));
   expect(q3(pos[1])).toBe(q3(target[1]));
+});
+
+// --- timeToTravelDistance ---
+
+describe("timeToTravelDistance", () => {
+  test("stopped ball returns null", () => {
+    const ball = new BallState([1, 1], [0, 0], 0, MotionState.STOPPED);
+    expect(timeToTravelDistance(ball, 0.5, G)).toBeNull();
+  });
+
+  test("zero distance returns 0", () => {
+    const ball = new BallState([1, 1], [1, 0], 0, MotionState.ROLLING);
+    expect(timeToTravelDistance(ball, 0, G)).toBe(0);
+  });
+
+  test("rolling ball reaches a short distance", () => {
+    const ball = new BallState([1, 1], [2, 0], 0, MotionState.ROLLING);
+    const t = timeToTravelDistance(ball, 0.1, G);
+    expect(t).not.toBeNull();
+    expect(t).toBeGreaterThan(0);
+    // Verify: distance = speed*t - 0.5*a*t²
+    const speed = 2;
+    const a = ball.mu()! * G;
+    const traveled = speed * t! - 0.5 * a * t! * t!;
+    expect(traveled).toBeCloseTo(0.1, 4);
+  });
+
+  test("ball that stops before reaching distance returns null", () => {
+    // Very slow ball, long distance
+    const ball = new BallState([1, 1], [0.1, 0], 0, MotionState.ROLLING);
+    const t = timeToTravelDistance(ball, 10, G);
+    expect(t).toBeNull();
+  });
+
+  test("sliding ball reaches distance before transition", () => {
+    const ball = cueStrike([1, 0.71], [1, 0], 3);
+    expect(ball.motion).toBe(MotionState.SLIDING);
+    const t = timeToTravelDistance(ball, 0.05, G);
+    expect(t).not.toBeNull();
+    expect(t).toBeGreaterThan(0);
+  });
+
+  test("agrees with timeToReachPoint for straight-line case", () => {
+    const ball = new BallState([0, 0], [1, 0], 0, MotionState.ROLLING);
+    const target: [number, number] = [0.5, 0];
+    const t1 = timeToReachPoint(ball, target, G);
+    const t2 = timeToTravelDistance(ball, 0.5, G);
+    expect(t1).not.toBeNull();
+    expect(t2).not.toBeNull();
+    expect(t2).toBeCloseTo(t1!, 6);
+  });
 });

@@ -24,8 +24,13 @@ export const strings = {
     max_follow: { name: "Max Follow", description: "Full topspin — cue follows through" },
     lag_shot: { name: "Lag Shot", description: "Gentle roll to far rail and back" },
     baulk_to_rail: { name: "Baulk to Rail", description: "Calibration — just reaches far rail" },
-    pot_corner: { name: "Pot Corner", description: "Straight shot into corner pocket" },
+    pot_corner_tr: { name: "Pot Corner TR", description: "Straight pot into top-right corner" },
+    pot_corner_tl: { name: "Pot Corner TL", description: "Straight pot into top-left corner" },
+    pot_corner_br: { name: "Pot Corner BR", description: "Straight pot into bottom-right corner" },
+    pot_corner_bl: { name: "Pot Corner BL", description: "Straight pot into bottom-left corner" },
     pot_side: { name: "Pot Side", description: "Straight shot into side pocket" },
+    pot_side_higher: { name: "Pot Side Higher", description: "Straight shot into side pocket from higher position" },
+    pot_side_right: { name: "Pot Side Right", description: "Straight shot into right side pocket" },
   },
 } as const;
 

@@ -1,10 +1,9 @@
 import { View } from "react-native";
 import { useMemo } from "react";
-import { POCKET_CONFIG } from "../engine/physics/constants";
+import { getPockets, STANDARD_9_FOOT, POCKET_CONFIG } from "../engine/physics/constants";
 
 const POCKET_COLOR = "#f5f0dc";
 const INCHES_TO_M = 0.0254;
-
 
 interface CornerPocketsProps {
   tableWidth: number;
@@ -21,29 +20,33 @@ export default function CornerPockets({ tableWidth, tableHeight, railThickness, 
     const cw = tableWidth + 2 * CT;
     const ch = tableHeight + 2 * CT;
 
+    const pockets = getPockets(STANDARD_9_FOOT).filter((p) => p.type === "corner");
+
     const cr = POCKET_CONFIG.cornerClothRadius * INCHES_TO_M * scale;
-    const clipW = POCKET_CONFIG.cornerPocketMouth * INCHES_TO_M * scale;
-    const backR = clipW / 2;
     const clipH = cr * 0.85;
 
-    const pockets: { key: string; cx: number; cy: number; rot: number }[] = [
-      { key: "tl", cx: R,      cy: R,      rot: -45 },
-      { key: "tr", cx: R + cw, cy: R,      rot: 45 },
-      { key: "bl", cx: R,      cy: R + ch, rot: -135 },
-      { key: "br", cx: R + cw, cy: R + ch, rot: 135 },
+    const screenPositions: { key: string; pocketIdx: number; cx: number; cy: number; rot: number }[] = [
+      { key: "tl", pocketIdx: 0, cx: R,      cy: R,      rot: -45 },
+      { key: "tr", pocketIdx: 1, cx: R + cw, cy: R,      rot: 45 },
+      { key: "bl", pocketIdx: 2, cx: R,      cy: R + ch, rot: -135 },
+      { key: "br", pocketIdx: 3, cx: R + cw, cy: R + ch, rot: 135 },
     ];
 
     const views: React.JSX.Element[] = [];
 
-    for (const p of pockets) {
+    for (const s of screenPositions) {
+      const pocket = pockets[s.pocketIdx];
+      const backR = pocket.backRadius * scale;
+      const clipW = pocket.mouthWidth * scale;
+
       // Back semicircle
       views.push(
         <View
-          key={`${p.key}-back`}
+          key={`${s.key}-back`}
           style={{
             position: "absolute",
-            left: p.cx - backR,
-            top: p.cy - backR,
+            left: s.cx - backR,
+            top: s.cy - backR,
             width: backR * 2,
             height: backR * 2,
             borderRadius: backR,
@@ -55,17 +58,17 @@ export default function CornerPockets({ tableWidth, tableHeight, railThickness, 
       // Cloth arc — large circle clipped to mouth width
       views.push(
         <View
-          key={`${p.key}-cloth`}
+          key={`${s.key}-cloth`}
           style={{
             position: "absolute",
-            left: p.cx - clipW / 2,
-            top: p.cy,
+            left: s.cx - clipW / 2,
+            top: s.cy,
             width: clipW,
             height: clipH,
             overflow: "hidden",
             transform: [
               { translateY: -clipH / 2 },
-              { rotate: `${p.rot}deg` },
+              { rotate: `${s.rot}deg` },
               { translateY: clipH / 2 },
             ],
           }}
