@@ -145,4 +145,10 @@ export const ALL_SCENARIOS: Scenario[] = [
       new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
     ];
   }),
+
+  scenario("two_ball", () => [
+    cueStrike([CUE_X, CY], [1, 0], 2.5),
+    new BallState([OBJ_X, CY], [0, 0], 0, MotionState.STOPPED),
+    new BallState([OBJ_X, CY + 0.3], [0, 0], 0, MotionState.STOPPED),
+  ]),
 ];

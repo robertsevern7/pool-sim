@@ -3,12 +3,13 @@ import { useLocalSearchParams } from "expo-router";
 import { useMemo, useCallback } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import { ALL_SCENARIOS } from "../engine/scenarios";
-import { useGameState } from "../hooks/useGameState";
+import { useGameState, FINE_AIM_STEP, COARSE_AIM_STEP } from "../hooks/useGameState";
 import Ball from "../components/Ball";
 import Cushions from "../components/Cushions";
 import CornerPockets from "../components/CornerPockets";
 import SidePockets from "../components/SidePockets";
 import TrajectoryLine from "../components/TrajectoryLine";
+import CueBallControl from "../components/CueBallControl";
 import type { Vec2 } from "../engine/physics/vec2";
 import { strings } from "../constants/strings";
 
@@ -29,6 +30,8 @@ const LONG_RAIL_POSITIONS = [1, 2, 3, 5, 6, 7].map((i) => (i * SEGMENT) / TABLE_
 const SHORT_RAIL_POSITIONS = [1, 2, 3].map((i) => (i * SEGMENT) / TABLE_HEIGHT_M);
 const DIAMOND_SIZE = 8;
 
+const CONTROLS_HEIGHT = 90;
+
 export default function TableScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { scenario: scenarioId } = useLocalSearchParams<{ scenario?: string }>();
@@ -40,17 +43,24 @@ export default function TableScreen() {
     return scenario.createBalls();
   }, [scenarioId]);
 
-  const { mode, balls, trajectories, shoot, reset } = useGameState(initialBalls);
+  const {
+    mode,
+    balls,
+    trajectories,
+    shoot,
+    setTarget,
+    adjustAngle,
+  } = useGameState(initialBalls);
 
   const padding = 24;
-  const buttonHeight = scenarioId ? 60 : 0;
+  const controlsSpace = scenarioId ? CONTROLS_HEIGHT + 16 : 0;
 
   // Cushion thickness in pixels depends on scale, and scale depends on tableWidth.
   // Solve: tableWidth * (1 + 2k) = availableSpace, where k = CT_m / TABLE_HEIGHT_M
   const CT_M = CUSHION_THICKNESS_INCHES * INCHES_TO_M;
   const k = CT_M / TABLE_HEIGHT_M;
   const availW = screenWidth - padding * 2 - RAIL_THICKNESS * 2;
-  const availH = screenHeight - padding * 2 - RAIL_THICKNESS * 2 - buttonHeight;
+  const availH = screenHeight - padding * 2 - RAIL_THICKNESS * 2 - controlsSpace;
 
   const maxTableW = availW / (1 + 2 * k);
   const maxTableH = availH / (1 + 2 * k * ASPECT_RATIO);
@@ -95,6 +105,10 @@ export default function TableScreen() {
       fracs.map((f, i) => <View key={`${key}-${i}`} style={[styles.diamond, pos(f), { transform: [squish, { rotate: "135deg" }] }]} />)
     );
   };
+
+  const canAim = mode === "preview" || mode === "done";
+  const showControls = !!scenarioId;
+  const isPlaying = mode === "playing";
 
   return (
     <View style={styles.container}>
@@ -183,8 +197,6 @@ export default function TableScreen() {
           />
         ))}
 
-
-
         {balls.map((ball, i) => (
           <Ball
             key={`ball-${i}`}
@@ -192,24 +204,75 @@ export default function TableScreen() {
             y={border + ball.pos[0] * scaleY}
             radius={ballRadius}
             isCue={i === 0}
+            onPress={
+              canAim && i > 0
+                ? () => setTarget(i)
+                : undefined
+            }
           />
         ))}
       </View>
 
-      {scenarioId && (
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            pressed && styles.buttonPressed,
-            mode === "playing" && styles.buttonDisabled,
-          ]}
-          onPress={mode === "done" ? reset : shoot}
-          disabled={mode === "playing"}
-        >
-          <Text style={styles.buttonText}>
-            {mode === "done" ? strings.table.reset : strings.table.shoot}
-          </Text>
-        </Pressable>
+      {showControls && (
+        <View style={styles.controlBar}>
+          {/* Bottom-left: Cue ball contact point */}
+          <View style={styles.controlLeft}>
+            <CueBallControl />
+          </View>
+
+          {/* Center: Shoot */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.shootButton,
+              pressed && styles.buttonPressed,
+              isPlaying && styles.buttonDisabled,
+            ]}
+            onPress={shoot}
+            disabled={isPlaying}
+          >
+            <Text style={styles.shootButtonText}>
+              {strings.table.shoot}
+            </Text>
+          </Pressable>
+
+          {/* Bottom-right: Aim controls */}
+          <View style={styles.controlRight}>
+            <View style={[styles.aimControls, isPlaying && styles.buttonDisabled]}>
+              <View style={styles.aimRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.aimButton, !isPlaying && pressed && styles.buttonPressed]}
+                  onPress={() => adjustAngle(-COARSE_AIM_STEP)}
+                  disabled={isPlaying}
+                >
+                  <Text style={styles.aimButtonText}>{strings.table.aimLeft}</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.aimButton, !isPlaying && pressed && styles.buttonPressed]}
+                  onPress={() => adjustAngle(COARSE_AIM_STEP)}
+                  disabled={isPlaying}
+                >
+                  <Text style={styles.aimButtonText}>{strings.table.aimRight}</Text>
+                </Pressable>
+              </View>
+              <View style={styles.aimRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.aimButtonFine, !isPlaying && pressed && styles.buttonPressed]}
+                  onPress={() => adjustAngle(-FINE_AIM_STEP)}
+                  disabled={isPlaying}
+                >
+                  <Text style={styles.aimButtonFineText}>{strings.table.aimLeftFine}</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.aimButtonFine, !isPlaying && pressed && styles.buttonPressed]}
+                  onPress={() => adjustAngle(FINE_AIM_STEP)}
+                  disabled={isPlaying}
+                >
+                  <Text style={styles.aimButtonFineText}>{strings.table.aimRightFine}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -236,12 +299,32 @@ const styles = StyleSheet.create({
     height: DIAMOND_SIZE,
     backgroundColor: DIAMOND_COLOR,
   },
-  button: {
+  controlBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    height: CONTROLS_HEIGHT,
+    paddingHorizontal: 16,
     marginTop: 16,
+  },
+  controlLeft: {
+    flex: 1,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  controlRight: {
+    flex: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  shootButton: {
     backgroundColor: "#2a6a8a",
     paddingHorizontal: 32,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonPressed: {
     opacity: 0.7,
@@ -249,9 +332,39 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.4,
   },
-  buttonText: {
+  shootButtonText: {
     color: "#fff",
     fontSize: 18,
+    fontWeight: "600",
+  },
+  aimControls: {
+    gap: 6,
+    alignItems: "center",
+  },
+  aimRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  aimButton: {
+    backgroundColor: "#3a3a3a",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  aimButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  aimButtonFine: {
+    backgroundColor: "#555",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  aimButtonFineText: {
+    color: "#ddd",
+    fontSize: 16,
     fontWeight: "600",
   },
 });

@@ -14,6 +14,10 @@ export const strings = {
   table: {
     shoot: "Shoot",
     reset: "Reset",
+    aimLeft: "◀",
+    aimRight: "▶",
+    aimLeftFine: "◁",
+    aimRightFine: "▷",
   },
   scenarios: {
     rolling_direct: { name: "Rolling Direct", description: "Natural roll into object ball" },
@@ -31,6 +35,7 @@ export const strings = {
     pot_side: { name: "Pot Side", description: "Straight shot into side pocket" },
     pot_side_higher: { name: "Pot Side Higher", description: "Straight shot into side pocket from higher position" },
     pot_side_right: { name: "Pot Side Right", description: "Straight shot into right side pocket" },
+    two_ball: { name: "Two Ball", description: "Cue ball and object ball — aim freely" },
   },
 } as const;
 
