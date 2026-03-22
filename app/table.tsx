@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import { ALL_SCENARIOS } from "../engine/scenarios";
 import { useGameState, FINE_AIM_STEP, COARSE_AIM_STEP } from "../hooks/useGameState";
@@ -49,6 +49,7 @@ export default function TableScreen() {
     trajectories,
     shoot,
     setTarget,
+    aimAtPoint,
     adjustAngle,
   } = useGameState(initialBalls);
 
@@ -90,6 +91,20 @@ export default function TableScreen() {
     [scaleX, scaleY],
   );
 
+  const tableRef = useRef<View>(null);
+  const handleTablePress = useCallback(
+    (e: { nativeEvent: { pageX: number; pageY: number } }) => {
+      tableRef.current?.measure((_x, _y, _w, _h, pageOffsetX, pageOffsetY) => {
+        const localX = e.nativeEvent.pageX - pageOffsetX;
+        const localY = e.nativeEvent.pageY - pageOffsetY;
+        const physX = (localY - border) / scaleY;
+        const physY = (localX - border) / scaleX;
+        aimAtPoint([physX, physY]);
+      });
+    },
+    [scaleX, scaleY, border, aimAtPoint],
+  );
+
   const rc = RAIL_THICKNESS / 2 - DIAMOND_SIZE / 2;
   const d = DIAMOND_SIZE / 2;
 
@@ -112,7 +127,9 @@ export default function TableScreen() {
 
   return (
     <View style={styles.container}>
-      <View
+      <Pressable
+        ref={tableRef}
+        onPress={canAim ? handleTablePress : undefined}
         style={[
           styles.rail,
           {
@@ -211,7 +228,7 @@ export default function TableScreen() {
             }
           />
         ))}
-      </View>
+      </Pressable>
 
       {showControls && (
         <View style={styles.controlBar}>

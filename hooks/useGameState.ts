@@ -18,13 +18,11 @@ export const COARSE_AIM_STEP = 2.0 * (Math.PI / 180);
 interface GameState {
   mode: Mode;
   initialBalls: BallState[];
-  /** Cue ball speed from original scenario (preserved during aiming) */
   cueSpeed: number;
-  /** Cue ball spin from original scenario */
   cueSpin: number;
-  /** Index of the targeted object ball (1-based, null = no target) */
   targetBallIndex: number | null;
-  /** Fine-tune angle offset in radians */
+  /** Explicit aim direction (from tapping table), overrides target ball */
+  aimDirection: Vec2 | null;
   aimAngleOffset: number;
   frames: Frame[];
   frameIndex: number;
@@ -34,6 +32,7 @@ interface GameState {
 type Action =
   | { type: "LOAD_SCENARIO"; balls: BallState[] }
   | { type: "SET_TARGET"; ballIndex: number }
+  | { type: "AIM_AT_POINT"; point: Vec2 }
   | { type: "ADJUST_ANGLE"; delta: number }
   | { type: "SHOOT" }
   | { type: "TICK" }
@@ -49,9 +48,10 @@ function buildAimedBalls(state: GameState): BallState[] {
   const cueBall = state.initialBalls[0];
   if (!cueBall) return state.initialBalls;
 
-  // Base direction: toward target ball, or the original cue velocity direction
   let dir: Vec2;
-  if (state.targetBallIndex !== null) {
+  if (state.aimDirection !== null) {
+    dir = state.aimDirection;
+  } else if (state.targetBallIndex !== null) {
     const targetBall = state.initialBalls[state.targetBallIndex];
     if (!targetBall) return state.initialBalls;
     dir = normalize(sub(targetBall.pos, cueBall.pos));
@@ -60,7 +60,6 @@ function buildAimedBalls(state: GameState): BallState[] {
     if (speed > 0) {
       dir = normalize(cueBall.vel);
     } else {
-      // Stopped cue ball with no target — aim right by default
       dir = [1, 0];
     }
   }
@@ -84,7 +83,6 @@ function recomputeSimulation(state: GameState): GameState {
   return { ...state, frames, frameIndex: 0, trajectories };
 }
 
-/** Build a preview state from final frame positions (no trajectories yet). */
 function previewFromFinalPositions(state: GameState): GameState {
   const finalFrame = state.frames.length > 0
     ? state.frames[state.frames.length - 1]
@@ -107,6 +105,7 @@ function previewFromFinalPositions(state: GameState): GameState {
     cueSpeed: state.cueSpeed,
     cueSpin: state.cueSpin,
     targetBallIndex: newBalls.length > 1 ? 1 : null,
+    aimDirection: null,
     aimAngleOffset: 0,
     frames: [],
     frameIndex: 0,
@@ -126,6 +125,7 @@ function reducer(state: GameState, action: Action): GameState {
         cueSpeed: speed,
         cueSpin: spin,
         targetBallIndex: null,
+        aimDirection: null,
         aimAngleOffset: 0,
         frames,
         frameIndex: 0,
@@ -141,6 +141,23 @@ function reducer(state: GameState, action: Action): GameState {
       return recomputeSimulation({
         ...base,
         targetBallIndex: action.ballIndex,
+        aimDirection: null,
+        aimAngleOffset: 0,
+      });
+    }
+
+    case "AIM_AT_POINT": {
+      let base = state;
+      if (state.mode === "done") base = previewFromFinalPositions(state);
+      if (base.mode !== "preview") return state;
+      const cueBall = base.initialBalls[0];
+      if (!cueBall) return state;
+      const diff = sub(action.point, cueBall.pos);
+      if (norm(diff) < 0.001) return state;
+      return recomputeSimulation({
+        ...base,
+        targetBallIndex: null,
+        aimDirection: normalize(diff),
         aimAngleOffset: 0,
       });
     }
@@ -192,6 +209,7 @@ const INITIAL_STATE: GameState = {
   cueSpeed: 0,
   cueSpin: 0,
   targetBallIndex: null,
+  aimDirection: null,
   aimAngleOffset: 0,
   frames: [],
   frameIndex: 0,
@@ -202,14 +220,12 @@ export function useGameState(initialBalls: BallState[]) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const rafRef = useRef<number | null>(null);
 
-  // Load scenario when balls change
   useEffect(() => {
     if (initialBalls.length > 0) {
       dispatch({ type: "LOAD_SCENARIO", balls: initialBalls });
     }
   }, [initialBalls]);
 
-  // Animation loop
   useEffect(() => {
     if (state.mode !== "playing") {
       if (rafRef.current !== null) {
@@ -242,12 +258,15 @@ export function useGameState(initialBalls: BallState[]) {
     (ballIndex: number) => dispatch({ type: "SET_TARGET", ballIndex }),
     [],
   );
+  const aimAtPoint = useCallback(
+    (point: Vec2) => dispatch({ type: "AIM_AT_POINT", point }),
+    [],
+  );
   const adjustAngle = useCallback(
     (delta: number) => dispatch({ type: "ADJUST_ANGLE", delta }),
     [],
   );
 
-  // Current ball positions: during playback use frames, otherwise use initial positions
   const currentBalls =
     state.frames.length > 0 && state.frameIndex < state.frames.length
       ? state.frames[state.frameIndex].balls
@@ -260,6 +279,7 @@ export function useGameState(initialBalls: BallState[]) {
     targetBallIndex: state.targetBallIndex,
     shoot,
     setTarget,
+    aimAtPoint,
     adjustAngle,
   };
 }
