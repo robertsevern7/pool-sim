@@ -1,4 +1,12 @@
-import { useReducer, useRef, useCallback, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useReducer,
+  useRef,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from "react";
 import { BallState, MotionState } from "../engine/physics/ball-state";
 import { STANDARD_9_FOOT, MAX_CUE_SPIN } from "../engine/physics/constants";
 import {
@@ -10,17 +18,20 @@ import {
 import { cueStrike } from "../engine/physics/motion-models";
 import { Vec2, norm, normalize, sub } from "../engine/physics/vec2";
 
-type Mode = "preview" | "playing" | "done";
+// ── Constants ────────────────────────────────────────────────────────
 
 export const FINE_AIM_STEP = 0.02 * (Math.PI / 180);
 export const COARSE_AIM_STEP = 2.0 * (Math.PI / 180);
 export const MAX_POWER = 5.0; // m/s
 
-interface GameState {
+// ── Types ────────────────────────────────────────────────────────────
+
+type Mode = "preview" | "playing" | "done";
+
+interface InternalState {
   mode: Mode;
   initialBalls: BallState[];
   cueSpin: number;
-  /** Cue ball speed in m/s */
   power: number;
   targetBallIndex: number | null;
   aimDirection: Vec2 | null;
@@ -29,6 +40,33 @@ interface GameState {
   frameIndex: number;
   trajectories: Trajectory[];
 }
+
+/** Public game state exposed via context */
+export interface GameState {
+  mode: Mode;
+  balls: { pos: Vec2; motion: number }[];
+  trajectories: Trajectory[];
+  targetBallIndex: number | null;
+  power: number;
+  spin: number;
+}
+
+/** Dispatch functions exposed via context */
+export interface GameDispatch {
+  shoot: () => void;
+  setTarget: (ballIndex: number) => void;
+  aimAtPoint: (point: Vec2) => void;
+  adjustAngle: (delta: number) => void;
+  setPower: (power: number) => void;
+  setSpin: (spin: number) => void;
+}
+
+// ── Contexts ─────────────────────────────────────────────────────────
+
+const GameStateContext = createContext<GameState | null>(null);
+const GameDispatchContext = createContext<GameDispatch | null>(null);
+
+// ── Reducer ──────────────────────────────────────────────────────────
 
 type Action =
   | { type: "LOAD_SCENARIO"; balls: BallState[] }
@@ -47,7 +85,7 @@ function extractCueParams(cueBall: BallState): { speed: number; spin: number } {
   return { speed, spin: speed > 0 ? omega / (MAX_CUE_SPIN * speed) : 0 };
 }
 
-function buildAimedBalls(state: GameState): BallState[] {
+function buildAimedBalls(state: InternalState): BallState[] {
   const cueBall = state.initialBalls[0];
   if (!cueBall) return state.initialBalls;
 
@@ -78,14 +116,14 @@ function buildAimedBalls(state: GameState): BallState[] {
   return [newCue, ...state.initialBalls.slice(1)];
 }
 
-function recomputeSimulation(state: GameState): GameState {
+function recomputeSimulation(state: InternalState): InternalState {
   const balls = buildAimedBalls(state);
   const frames = recordSimulation(balls, STANDARD_9_FOOT);
   const trajectories = recordTrajectories(balls, STANDARD_9_FOOT);
   return { ...state, frames, frameIndex: 0, trajectories };
 }
 
-function previewFromFinalPositions(state: GameState): GameState {
+function previewFromFinalPositions(state: InternalState): InternalState {
   const finalFrame = state.frames.length > 0
     ? state.frames[state.frames.length - 1]
     : null;
@@ -115,7 +153,7 @@ function previewFromFinalPositions(state: GameState): GameState {
   };
 }
 
-function reducer(state: GameState, action: Action): GameState {
+function reducer(state: InternalState, action: Action): InternalState {
   switch (action.type) {
     case "LOAD_SCENARIO": {
       const { speed, spin } = extractCueParams(action.balls[0]);
@@ -221,7 +259,7 @@ function reducer(state: GameState, action: Action): GameState {
   }
 }
 
-const INITIAL_STATE: GameState = {
+const INITIAL_STATE: InternalState = {
   mode: "preview",
   initialBalls: [],
   cueSpin: 0,
@@ -234,7 +272,14 @@ const INITIAL_STATE: GameState = {
   trajectories: [],
 };
 
-export function useGameState(initialBalls: BallState[]) {
+// ── Provider ─────────────────────────────────────────────────────────
+
+interface GameProviderProps {
+  initialBalls: BallState[];
+  children: ReactNode;
+}
+
+export function GameProvider({ initialBalls, children }: GameProviderProps) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const rafRef = useRef<number | null>(null);
 
@@ -271,45 +316,48 @@ export function useGameState(initialBalls: BallState[]) {
     };
   }, [state.mode]);
 
-  const shoot = useCallback(() => dispatch({ type: "SHOOT" }), []);
-  const setTarget = useCallback(
-    (ballIndex: number) => dispatch({ type: "SET_TARGET", ballIndex }),
-    [],
-  );
-  const aimAtPoint = useCallback(
-    (point: Vec2) => dispatch({ type: "AIM_AT_POINT", point }),
-    [],
-  );
-  const adjustAngle = useCallback(
-    (delta: number) => dispatch({ type: "ADJUST_ANGLE", delta }),
-    [],
-  );
-  const setPower = useCallback(
-    (power: number) => dispatch({ type: "SET_POWER", power }),
-    [],
-  );
-  const setSpin = useCallback(
-    (spin: number) => dispatch({ type: "SET_SPIN", spin }),
-    [],
-  );
-
   const currentBalls =
     state.frames.length > 0 && state.frameIndex < state.frames.length
       ? state.frames[state.frameIndex].balls
       : state.initialBalls.map((b) => ({ pos: b.pos, motion: b.motion }));
 
-  return {
+  const gameState: GameState = {
     mode: state.mode,
     balls: currentBalls,
     trajectories: state.trajectories,
     targetBallIndex: state.targetBallIndex,
     power: state.power,
-    shoot,
-    setTarget,
-    aimAtPoint,
-    adjustAngle,
-    setPower,
     spin: state.cueSpin,
-    setSpin,
   };
+
+  const gameDispatch: GameDispatch = {
+    shoot: useCallback(() => dispatch({ type: "SHOOT" }), []),
+    setTarget: useCallback((ballIndex: number) => dispatch({ type: "SET_TARGET", ballIndex }), []),
+    aimAtPoint: useCallback((point: Vec2) => dispatch({ type: "AIM_AT_POINT", point }), []),
+    adjustAngle: useCallback((delta: number) => dispatch({ type: "ADJUST_ANGLE", delta }), []),
+    setPower: useCallback((power: number) => dispatch({ type: "SET_POWER", power }), []),
+    setSpin: useCallback((spin: number) => dispatch({ type: "SET_SPIN", spin }), []),
+  };
+
+  return (
+    <GameStateContext.Provider value={gameState}>
+      <GameDispatchContext.Provider value={gameDispatch}>
+        {children}
+      </GameDispatchContext.Provider>
+    </GameStateContext.Provider>
+  );
+}
+
+// ── Hooks ────────────────────────────────────────────────────────────
+
+export function useGame(): GameState {
+  const ctx = useContext(GameStateContext);
+  if (!ctx) throw new Error("useGame must be used within a GameProvider");
+  return ctx;
+}
+
+export function useGameDispatch(): GameDispatch {
+  const ctx = useContext(GameDispatchContext);
+  if (!ctx) throw new Error("useGameDispatch must be used within a GameProvider");
+  return ctx;
 }
