@@ -59,7 +59,7 @@ export default function TableScreen() {
 
 function TableContent({ scenarioId }: { scenarioId?: string }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { mode, balls, trajectories } = useGame();
+  const { mode, balls, trajectories, trajectoryBallNumbers } = useGame();
   const { setTarget, aimAtPoint } = useGameDispatch();
 
   const padding = 24;
@@ -215,19 +215,19 @@ function TableContent({ scenarioId }: { scenarioId?: string }) {
             path={path}
             ballRadius={ballRadius}
             toScreen={toScreen}
-            isCue={i === 0}
+            ballNumber={trajectoryBallNumbers[i] ?? 0}
           />
         ))}
 
         {balls.map((ball, i) => (
           <Ball
-            key={`ball-${i}`}
+            key={`ball-${ball.number}`}
             x={border + ball.pos[1] * scaleX}
             y={border + ball.pos[0] * scaleY}
             radius={ballRadius}
-            isCue={i === 0}
+            ballNumber={ball.number}
             onPress={
-              canAim && i > 0
+              canAim && ball.number !== 0
                 ? () => setTarget(i)
                 : undefined
             }

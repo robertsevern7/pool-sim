@@ -1,32 +1,28 @@
 import { View, StyleSheet } from "react-native";
 import type { TrajectoryPoint } from "../engine/physics/recorder";
 import type { Vec2 } from "../engine/physics/vec2";
+import { getBallVisual } from "../engine/balls";
 
-interface TrajectoryLineProps {
+export interface TrajectoryLineProps {
   path: TrajectoryPoint[];
   ballRadius: number;
   toScreen: (pos: Vec2) => { x: number; y: number };
-  isCue: boolean;
+  ballNumber: number;
 }
 
-const CUE_LINE_COLOR = "rgba(255, 255, 240, 0.25)";
-const OBJ_LINE_COLOR = "rgba(230, 50, 50, 0.25)";
-const CUE_GHOST_COLOR = "rgb(180, 180, 170)";
-const OBJ_GHOST_COLOR = "rgb(150, 50, 50)";
-const GHOST_BORDER_CUE = CUE_GHOST_COLOR;
-const GHOST_BORDER_OBJ = OBJ_GHOST_COLOR;
-
-export default function TrajectoryLine({ path, ballRadius, toScreen, isCue }: TrajectoryLineProps) {
+export default function TrajectoryLine({ path, ballRadius, toScreen, ballNumber }: TrajectoryLineProps) {
   if (path.length < 2) return null;
 
-  const lineColor = isCue ? CUE_LINE_COLOR : OBJ_LINE_COLOR;
-  const ghostFill = isCue ? CUE_GHOST_COLOR : OBJ_GHOST_COLOR;
-  const ghostBorder = isCue ? GHOST_BORDER_CUE : GHOST_BORDER_OBJ;
+  const visual = getBallVisual(ballNumber);
+  const isCue = ballNumber === 0;
+  const baseColor = isCue ? "255, 255, 240" : hexToRgb(visual.color);
+  const lineColor = `rgba(${baseColor}, 0.25)`;
+  const ghostFill = isCue ? "rgb(180, 180, 170)" : `rgba(${baseColor}, 0.5)`;
+  const ghostBorder = ghostFill;
   const width = ballRadius * 2;
 
   const elements: React.ReactElement[] = [];
 
-  // Line segments
   for (let i = 0; i < path.length - 1; i++) {
     const a = toScreen(path[i].pos);
     const b = toScreen(path[i + 1].pos);
@@ -57,7 +53,6 @@ export default function TrajectoryLine({ path, ballRadius, toScreen, isCue }: Tr
     );
   }
 
-  // Ghost balls at collision points
   for (let i = 0; i < path.length; i++) {
     if (!path[i].ghost) continue;
     const p = toScreen(path[i].pos);
@@ -81,6 +76,14 @@ export default function TrajectoryLine({ path, ballRadius, toScreen, isCue }: Tr
   }
 
   return <>{elements}</>;
+}
+
+function hexToRgb(hex: string): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
 }
 
 const styles = StyleSheet.create({

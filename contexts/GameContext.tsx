@@ -44,8 +44,10 @@ interface InternalState {
 /** Public game state exposed via context */
 export interface GameState {
   mode: Mode;
-  balls: { pos: Vec2; motion: number }[];
+  balls: { pos: Vec2; motion: number; number: number }[];
   trajectories: Trajectory[];
+  /** Ball numbers matching trajectory indices (for coloring trajectory lines) */
+  trajectoryBallNumbers: number[];
   targetBallIndex: number | null;
   power: number;
   spin: number;
@@ -136,6 +138,7 @@ function previewFromFinalPositions(state: InternalState): InternalState {
       [0, 0],
       0,
       MotionState.STOPPED,
+      b.number,
     ),
   );
 
@@ -319,12 +322,13 @@ export function GameProvider({ initialBalls, children }: GameProviderProps) {
   const currentBalls =
     state.frames.length > 0 && state.frameIndex < state.frames.length
       ? state.frames[state.frameIndex].balls
-      : state.initialBalls.map((b) => ({ pos: b.pos, motion: b.motion }));
+      : state.initialBalls.map((b) => ({ pos: b.pos, motion: b.motion, number: b.number }));
 
   const gameState: GameState = {
     mode: state.mode,
     balls: currentBalls,
     trajectories: state.trajectories,
+    trajectoryBallNumbers: state.initialBalls.map((b) => b.number),
     targetBallIndex: state.targetBallIndex,
     power: state.power,
     spin: state.cueSpin,

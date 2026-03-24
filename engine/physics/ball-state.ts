@@ -14,17 +14,21 @@ export class BallState {
   vel: [number, number];
   omega: number;
   motion: MotionState;
+  /** Ball identity: 0 = cue, 1–15 = object balls */
+  number: number;
 
   constructor(
     pos: [number, number],
     vel: [number, number],
     omega: number,
     motion: MotionState,
+    ballNumber: number = 0,
   ) {
     this.pos = [pos[0], pos[1]];
     this.vel = [vel[0], vel[1]];
     this.omega = omega;
     this.motion = motion;
+    this.number = ballNumber;
   }
 
   get radius() {

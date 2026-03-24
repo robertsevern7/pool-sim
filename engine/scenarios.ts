@@ -12,6 +12,10 @@ const CUE_X = TABLE.width / 2 - GAP / 2;
 const OBJ_X = CUE_X + GAP;
 const CY = TABLE.height / 2;
 
+function obj(pos: [number, number], ballNumber: number): BallState {
+  return new BallState(pos, [0, 0], 0, MotionState.STOPPED, ballNumber);
+}
+
 export interface Scenario {
   id: ScenarioId;
   name: string;
@@ -24,30 +28,73 @@ function scenario(id: ScenarioId, createBalls: () => BallState[]): Scenario {
   return { id, name, description, createBalls };
 }
 
+// ── Standard 8-ball rack ─────────────────────────────────────────────
+
+function createRack(): BallState[] {
+  const footSpot: [number, number] = [TABLE.width * 3 / 4, CY];
+  const rowGap = R * Math.sqrt(3) * 2; // center-to-center row distance
+
+  // Standard 8-ball rack layout (apex to back):
+  // Row 0: 1
+  // Row 1: 10, 2
+  // Row 2: 3, 8, 11
+  // Row 3: 12, 4, 5, 13
+  // Row 4: 6, 14, 9, 7, 15
+  const rows: number[][] = [
+    [1],
+    [10, 2],
+    [3, 8, 11],
+    [12, 4, 5, 13],
+    [6, 14, 9, 7, 15],
+  ];
+
+  const balls: BallState[] = [];
+  for (let row = 0; row < rows.length; row++) {
+    const count = rows[row].length;
+    const x = footSpot[0] + row * rowGap;
+    const startY = footSpot[1] - (count - 1) * R;
+    for (let col = 0; col < count; col++) {
+      const y = startY + col * R * 2;
+      balls.push(obj([x, y], rows[row][col]));
+    }
+  }
+  return balls;
+}
+
+// ── Scenarios ────────────────────────────────────────────────────────
+
 export const ALL_SCENARIOS: Scenario[] = [
+  // User scenarios
+  scenario("free_play", () => {
+    const baulkX = TABLE.width / 4;
+    const cue = new BallState([baulkX, CY], [0, 0], 0, MotionState.STOPPED, 0);
+    return [cue, ...createRack()];
+  }),
+
+  // Debug scenarios
   scenario("rolling_direct", () => [
     cueStrike([CUE_X, CY], [1, 0], 2.0),
-    new BallState([OBJ_X, CY], [0, 0], 0, MotionState.STOPPED),
+    obj([OBJ_X, CY], 1),
   ]),
   scenario("half_ball_rolling", () => [
     cueStrike([CUE_X, CY], [1, 0], 2.5),
-    new BallState([OBJ_X, CY + R], [0, 0], 0, MotionState.STOPPED),
+    obj([OBJ_X, CY + R], 1),
   ]),
   scenario("stop_shot", () => [
     cueStrike([CUE_X, CY], [1, 0], 3.0, -0.435),
-    new BallState([OBJ_X, CY], [0, 0], 0, MotionState.STOPPED),
+    obj([OBJ_X, CY], 1),
   ]),
   scenario("half_ball_stun", () => [
     cueStrike([CUE_X, CY], [1, 0], 3.0, -0.435),
-    new BallState([OBJ_X, CY + R], [0, 0], 0, MotionState.STOPPED),
+    obj([OBJ_X, CY + R], 1),
   ]),
   scenario("max_draw", () => [
     cueStrike([CUE_X, CY], [1, 0], 3.0, -1.0),
-    new BallState([OBJ_X, CY], [0, 0], 0, MotionState.STOPPED),
+    obj([OBJ_X, CY], 1),
   ]),
   scenario("max_follow", () => [
     cueStrike([CUE_X, CY], [1, 0], 3.0, 1.0),
-    new BallState([OBJ_X, CY], [0, 0], 0, MotionState.STOPPED),
+    obj([OBJ_X, CY], 1),
   ]),
   scenario("lag_shot", () => {
     const baulkX = TABLE.width / 4;
@@ -71,7 +118,7 @@ export const ALL_SCENARIOS: Scenario[] = [
     const dx = objX - cueX, dy = objY - cueY, len = Math.sqrt(dx * dx + dy * dy);
     return [
       cueStrike([cueX, cueY], [dx / len, dy / len], 2.5),
-      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+      obj([objX, objY], 2),
     ];
   }),
   scenario("pot_corner_tl", () => {
@@ -81,7 +128,7 @@ export const ALL_SCENARIOS: Scenario[] = [
     const dx = objX - cueX, dy = objY - cueY, len = Math.sqrt(dx * dx + dy * dy);
     return [
       cueStrike([cueX, cueY], [dx / len, dy / len], 2.5),
-      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+      obj([objX, objY], 3),
     ];
   }),
   scenario("pot_corner_br", () => {
@@ -91,7 +138,7 @@ export const ALL_SCENARIOS: Scenario[] = [
     const dx = objX - cueX, dy = objY - cueY, len = Math.sqrt(dx * dx + dy * dy);
     return [
       cueStrike([cueX, cueY], [dx / len, dy / len], 2.5),
-      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+      obj([objX, objY], 4),
     ];
   }),
   scenario("pot_corner_bl", () => {
@@ -101,11 +148,10 @@ export const ALL_SCENARIOS: Scenario[] = [
     const dx = objX - cueX, dy = objY - cueY, len = Math.sqrt(dx * dx + dy * dy);
     return [
       cueStrike([cueX, cueY], [dx / len, dy / len], 2.5),
-      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+      obj([objX, objY], 5),
     ];
   }),
   scenario("pot_side", () => {
-    // Object ball near the top side pocket, cue ball lined up straight
     const pocketX = TABLE.width / 2;
     const pocketY = 0;
     const objX = pocketX;
@@ -114,12 +160,10 @@ export const ALL_SCENARIOS: Scenario[] = [
     const cueY = objY + 0.5;
     return [
       cueStrike([cueX, cueY], [0, -1], 1.7),
-      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+      obj([objX, objY], 6),
     ];
   }),
-
   scenario("pot_side_higher", () => {
-    // Object ball near the top side pocket, cue ball lined up straight
     const pocketX = TABLE.width / 2;
     const pocketY = 0;
     const objX = pocketX - 0.02;
@@ -128,12 +172,10 @@ export const ALL_SCENARIOS: Scenario[] = [
     const cueY = objY + 0.5;
     return [
       cueStrike([cueX, cueY], [0, -1], 1.7),
-      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+      obj([objX, objY], 7),
     ];
   }),
-
   scenario("pot_side_right", () => {
-    // Object ball near the bottom side pocket (right rail), cue ball lined up straight
     const pocketX = TABLE.width / 2;
     const pocketY = TABLE.height;
     const objX = pocketX;
@@ -142,13 +184,12 @@ export const ALL_SCENARIOS: Scenario[] = [
     const cueY = objY - 0.5;
     return [
       cueStrike([cueX, cueY], [0, 1], 1.7),
-      new BallState([objX, objY], [0, 0], 0, MotionState.STOPPED),
+      obj([objX, objY], 9),
     ];
   }),
-
   scenario("two_ball", () => [
     cueStrike([CUE_X, CY], [1, 0], 2.5),
-    new BallState([OBJ_X, CY], [0, 0], 0, MotionState.STOPPED),
-    new BallState([OBJ_X, CY + 0.3], [0, 0], 0, MotionState.STOPPED),
+    obj([OBJ_X, CY], 1),
+    obj([OBJ_X, CY + 0.3], 10),
   ]),
 ];

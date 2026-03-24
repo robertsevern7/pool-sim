@@ -8,15 +8,21 @@ import { SimulationState } from "./simulation-state";
 import { BallState } from "./ball-state";
 import type { Vec2 } from "./vec2";
 
+export interface FrameBall {
+  pos: Vec2;
+  motion: MotionState;
+  number: number;
+}
+
 export interface Frame {
   time: number;
-  balls: { pos: Vec2; motion: MotionState }[];
+  balls: FrameBall[];
 }
 
 function snapshotBalls(state: SimulationState): Frame {
   return {
     time: state.time,
-    balls: state.balls.map((b) => ({ pos: [b.pos[0], b.pos[1]], motion: b.motion })),
+    balls: state.balls.map((b) => ({ pos: [b.pos[0], b.pos[1]], motion: b.motion, number: b.number })),
   };
 }
 
@@ -24,12 +30,12 @@ function interpolateState(state: SimulationState, dt: number): Frame {
   const balls = state.balls.map((ball) => {
     if (ball.motion === MotionState.SLIDING) {
       const { pos } = slidingMotion(ball, dt, G);
-      return { pos: pos as Vec2, motion: ball.motion };
+      return { pos: pos as Vec2, motion: ball.motion, number: ball.number };
     } else if (ball.motion === MotionState.ROLLING) {
       const { pos } = rollingMotion(ball, dt, G);
-      return { pos: pos as Vec2, motion: ball.motion };
+      return { pos: pos as Vec2, motion: ball.motion, number: ball.number };
     }
-    return { pos: [ball.pos[0], ball.pos[1]] as Vec2, motion: ball.motion };
+    return { pos: [ball.pos[0], ball.pos[1]] as Vec2, motion: ball.motion, number: ball.number };
   });
   return { time: state.time + dt, balls };
 }
@@ -67,7 +73,7 @@ export function recordTrajectories(
   table: Table,
 ): Trajectory[] {
   const balls = initialBalls.map(
-    (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion),
+    (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion, b.number),
   );
   const state = new SimulationState(balls, 0);
   const maxEvents = 10000;
@@ -149,7 +155,7 @@ export function recordSimulation(
 ): Frame[] {
   // Deep copy initial balls so we don't mutate the originals
   const balls = initialBalls.map(
-    (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion),
+    (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion, b.number),
   );
   const state = new SimulationState(balls, 0);
   const interval = 1 / fps;
