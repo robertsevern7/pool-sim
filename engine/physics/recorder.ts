@@ -144,15 +144,22 @@ export function recordTrajectories(
   return trajectories;
 }
 
+export interface SimulationResult {
+  frames: Frame[];
+  /** Ball number of the first ball the cue ball collides with, or null */
+  firstHitBallNumber: number | null;
+  /** Whether any ball hit a rail after the first ball-ball contact */
+  railHitAfterContact: boolean;
+}
+
 /**
  * Run the simulation and record frames at a fixed interval.
- * Returns an array of frames suitable for playback.
  */
 export function recordSimulation(
   initialBalls: BallState[],
   table: Table,
   fps: number = 60,
-): Frame[] {
+): SimulationResult {
   // Deep copy initial balls so we don't mutate the originals
   const balls = initialBalls.map(
     (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion, b.number),
@@ -163,11 +170,15 @@ export function recordSimulation(
   const maxEvents = 10000;
   let nextFrameTime = interval;
 
+  let cueIdx = balls.findIndex((b) => b.number === 0);
+  let firstHitBallNumber: number | null = null;
+  let hadBallContact = false;
+  let railHitAfterContact = false;
+
   for (let step = 0; step < maxEvents; step++) {
     const event = computeNextEvent(state, table);
 
     if (event === null) {
-      // No more events — record final frame if needed
       if (state.time < nextFrameTime) {
         frames.push(snapshotBalls(state));
       }
@@ -176,19 +187,44 @@ export function recordSimulation(
 
     const eventTime = event.time;
 
-    // Record frames up to this event
     while (nextFrameTime <= eventTime) {
       const dt = nextFrameTime - state.time;
       frames.push(interpolateState(state, dt));
       nextFrameTime += interval;
     }
 
-    // Advance to event and resolve
     const dt = eventTime - state.time;
     if (dt < 0) break;
     advanceState(state, dt);
+
+    // Track first hit by cue ball
+    if (event.eventType === "BALL_COLLISION") {
+      if (firstHitBallNumber === null && cueIdx >= 0) {
+        if (event.a === cueIdx && event.b !== null) {
+          firstHitBallNumber = state.balls[event.b].number;
+        } else if (event.b === cueIdx) {
+          firstHitBallNumber = state.balls[event.a].number;
+        }
+      }
+      hadBallContact = true;
+    }
+
+    // Track rail hit after any ball-ball contact
+    if (hadBallContact && !railHitAfterContact && event.eventType === "RAIL_COLLISION") {
+      railHitAfterContact = true;
+    }
+
+    // If cue ball is pocketed, update cueIdx
+    if (event.eventType === "POCKET") {
+      if (event.a === cueIdx) {
+        cueIdx = -1;
+      } else if (event.a < cueIdx) {
+        cueIdx--;
+      }
+    }
+
     resolveEvent(state, event, table);
   }
 
-  return frames;
+  return { frames, firstHitBallNumber, railHitAfterContact };
 }

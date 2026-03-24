@@ -17,6 +17,7 @@ import {
 } from "../engine/physics/recorder";
 import { cueStrike } from "../engine/physics/motion-models";
 import { Vec2, norm, normalize, sub } from "../engine/physics/vec2";
+import { analyzeShot, INITIAL_RULES, type GameRules } from "../engine/rules";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -39,6 +40,11 @@ interface InternalState {
   frames: Frame[];
   frameIndex: number;
   trajectories: Trajectory[];
+  /** Ball numbers at the start of the current shot (for rules analysis) */
+  ballNumbersBeforeShot: number[];
+  firstHitBallNumber: number | null;
+  railHitAfterContact: boolean;
+  rules: GameRules;
 }
 
 /** Public game state exposed via context */
@@ -46,11 +52,11 @@ export interface GameState {
   mode: Mode;
   balls: { pos: Vec2; motion: number; number: number }[];
   trajectories: Trajectory[];
-  /** Ball numbers matching trajectory indices (for coloring trajectory lines) */
   trajectoryBallNumbers: number[];
   targetBallIndex: number | null;
   power: number;
   spin: number;
+  rules: GameRules;
 }
 
 /** Dispatch functions exposed via context */
@@ -126,7 +132,7 @@ function buildAimedBalls(state: InternalState): BallState[] {
 
 function recomputeSimulation(state: InternalState): InternalState {
   const balls = buildAimedBalls(state);
-  const frames = recordSimulation(balls, STANDARD_9_FOOT);
+  const { frames } = recordSimulation(balls, STANDARD_9_FOOT);
   const trajectories = recordTrajectories(balls, STANDARD_9_FOOT);
   return { ...state, frames, frameIndex: 0, trajectories };
 }
@@ -149,10 +155,9 @@ function previewFromFinalPositions(state: InternalState): InternalState {
   );
 
   return {
+    ...state,
     mode: "preview",
     initialBalls: newBalls,
-    cueSpin: state.cueSpin,
-    power: state.power,
     targetBallIndex: newBalls.length > 1 ? 1 : null,
     aimDirection: null,
     aimAngleOffset: 0,
@@ -166,7 +171,6 @@ function reducer(state: InternalState, action: Action): InternalState {
   switch (action.type) {
     case "LOAD_SCENARIO": {
       if (action.placeCue) {
-        // No cue ball yet — enter placing mode
         return {
           mode: "placing",
           initialBalls: action.balls,
@@ -178,10 +182,13 @@ function reducer(state: InternalState, action: Action): InternalState {
           frames: [],
           frameIndex: 0,
           trajectories: [],
+          ballNumbersBeforeShot: [],
+          firstHitBallNumber: null,
+          rules: INITIAL_RULES,
         };
       }
       const { speed, spin } = extractCueParams(action.balls[0]);
-      const frames = recordSimulation(action.balls, STANDARD_9_FOOT);
+      const { frames } = recordSimulation(action.balls, STANDARD_9_FOOT);
       const trajectories = recordTrajectories(action.balls, STANDARD_9_FOOT);
       return {
         mode: "preview",
@@ -194,6 +201,10 @@ function reducer(state: InternalState, action: Action): InternalState {
         frames,
         frameIndex: 0,
         trajectories,
+        ballNumbersBeforeShot: [],
+        firstHitBallNumber: null,
+        railHitAfterContact: false,
+        rules: INITIAL_RULES,
       };
     }
 
@@ -222,7 +233,6 @@ function reducer(state: InternalState, action: Action): InternalState {
           ? new BallState(action.pos as [number, number], [0, 0], 0, MotionState.STOPPED, 0)
           : b,
       );
-      // Just update position — no simulation recompute (too expensive during drag)
       return {
         ...state,
         mode: "preview",
@@ -294,18 +304,24 @@ function reducer(state: InternalState, action: Action): InternalState {
 
     case "SHOOT": {
       if (state.initialBalls.length === 0) return state;
+      // Don't allow shooting if game is over
+      if (state.rules.result !== null) return state;
 
       let base = state;
       if (state.mode === "done") base = previewFromFinalPositions(state);
       if (base.mode !== "preview") return state;
 
       const aimed = buildAimedBalls(base);
-      const frames = recordSimulation(aimed, STANDARD_9_FOOT);
+      const ballNumbersBefore = aimed.map((b) => b.number);
+      const { frames, firstHitBallNumber, railHitAfterContact } = recordSimulation(aimed, STANDARD_9_FOOT);
       return {
         ...base,
         mode: "playing",
         frames,
         frameIndex: 0,
+        ballNumbersBeforeShot: ballNumbersBefore,
+        firstHitBallNumber,
+        railHitAfterContact,
       };
     }
 
@@ -313,7 +329,41 @@ function reducer(state: InternalState, action: Action): InternalState {
       if (state.mode !== "playing") return state;
       const next = state.frameIndex + 1;
       if (next >= state.frames.length) {
-        return { ...state, mode: "done", frameIndex: state.frames.length - 1 };
+        // Shot finished — analyze rules
+        const finalFrame = state.frames[state.frames.length - 1];
+        const ballNumbersAfter = finalFrame.balls.map((b) => b.number);
+        const newRules = analyzeShot(
+          state.ballNumbersBeforeShot,
+          ballNumbersAfter,
+          state.firstHitBallNumber,
+          state.railHitAfterContact,
+          state.rules,
+        );
+
+        const newState: InternalState = {
+          ...state,
+          mode: "done",
+          frameIndex: state.frames.length - 1,
+          rules: newRules,
+        };
+
+        // If cue ball was potted, go to placing mode
+        if (newRules.cueBallPotted && newRules.result === null) {
+          const finalBalls = finalFrame.balls
+            .filter((b) => b.number !== 0)
+            .map((b) => new BallState(
+              b.pos as [number, number], [0, 0], 0, MotionState.STOPPED, b.number,
+            ));
+          return {
+            ...newState,
+            mode: "placing",
+            initialBalls: finalBalls,
+            frames: [],
+            trajectories: [],
+          };
+        }
+
+        return newState;
       }
       return { ...state, frameIndex: next };
     }
@@ -334,6 +384,9 @@ const INITIAL_STATE: InternalState = {
   frames: [],
   frameIndex: 0,
   trajectories: [],
+  ballNumbersBeforeShot: [],
+  firstHitBallNumber: null,
+  rules: INITIAL_RULES,
 };
 
 // ── Provider ─────────────────────────────────────────────────────────
@@ -394,6 +447,7 @@ export function GameProvider({ initialBalls, placeCue, children }: GameProviderP
     targetBallIndex: state.targetBallIndex,
     power: state.power,
     spin: state.cueSpin,
+    rules: state.rules,
   };
 
   const gameDispatch: GameDispatch = {

@@ -150,7 +150,7 @@ test("intermediate non-ghost points do not exist (only start is non-ghost)", () 
 
 test("recordSimulation returns frames at roughly 60fps", () => {
   const ball = new BallState([0.5, CY], [1.0, 0], 1.0 / R, MotionState.ROLLING);
-  const frames = recordSimulation([ball], TABLE, 60);
+  const { frames } = recordSimulation([ball], TABLE, 60);
 
   expect(frames.length).toBeGreaterThan(1);
 
@@ -163,7 +163,7 @@ test("recordSimulation returns frames at roughly 60fps", () => {
 
 test("recordSimulation first and last frames bracket the motion", () => {
   const ball = new BallState([0.5, CY], [1.0, 0], 1.0 / R, MotionState.ROLLING);
-  const frames = recordSimulation([ball], TABLE, 60);
+  const { frames } = recordSimulation([ball], TABLE, 60);
 
   expect(frames[0].time).toBe(0);
   expect(frames[0].balls[0].pos[0]).toBeCloseTo(0.5, 4);

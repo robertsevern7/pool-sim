@@ -282,6 +282,8 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
         ))}
       </View>
 
+      <GameStatus />
+
       {hasControls && (
         isPlacing
           ? <View style={styles.controlBar}>
@@ -291,6 +293,28 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
       )}
     </View>
   );
+}
+
+function GameStatus() {
+  const { rules } = useGame();
+
+  if (rules.result === "win") {
+    return <Text style={[styles.statusText, styles.statusWin]}>You win!</Text>;
+  }
+  if (rules.result === "loss") {
+    return <Text style={[styles.statusText, styles.statusLoss]}>{rules.foul ?? "You lose"}</Text>;
+  }
+  if (rules.foul) {
+    return <Text style={[styles.statusText, styles.statusFoul]}>Foul: {rules.foul}</Text>;
+  }
+  if (rules.assignedSet) {
+    return (
+      <Text style={styles.statusText}>
+        You are {rules.assignedSet === "solid" ? "Solids (1-7)" : "Stripes (9-15)"}
+      </Text>
+    );
+  }
+  return null;
 }
 
 function Controls() {
@@ -454,5 +478,22 @@ const styles = StyleSheet.create({
     color: "#ddd",
     fontSize: 16,
     fontWeight: "600",
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginTop: 8,
+  },
+  statusWin: {
+    color: "#228B22",
+    fontSize: 18,
+  },
+  statusLoss: {
+    color: "#B22222",
+    fontSize: 18,
+  },
+  statusFoul: {
+    color: "#CC6600",
   },
 });
