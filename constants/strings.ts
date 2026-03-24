@@ -23,6 +23,7 @@ export const strings = {
   },
   scenarios: {
     free_play: { name: "Free Play", description: "Full rack — 15 balls" },
+    random: { name: "Random", description: "Randomly placed balls" },
     rolling_direct: { name: "Rolling Direct", description: "Natural roll into object ball" },
     half_ball_rolling: { name: "Rolling ½ Ball", description: "Rolling cut shot" },
     stop_shot: { name: "Stop Shot", description: "Backspin — cue stops dead" },

@@ -6,7 +6,7 @@ export default function Index() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{strings.app.title}</Text>
-      <Link href={{ pathname: "/table", params: { scenario: "free_play" } }} style={styles.link}>
+      <Link href="/free-play" style={styles.link}>
         <Text style={styles.linkText}>{strings.home.goToTable}</Text>
       </Link>
       <Link href="/scenarios" style={[styles.link, { marginTop: 12 }]}>

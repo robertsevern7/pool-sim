@@ -1,9 +1,6 @@
 import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
-import { useLocalSearchParams } from "expo-router";
 import { useMemo, useCallback, useRef } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
-import { SCENARIOS } from "../engine/scenarios";
-import { DEBUG_SCENARIOS } from "../engine/debug-scenarios";
 import {
   GameProvider,
   useGame,
@@ -12,15 +9,19 @@ import {
   COARSE_AIM_STEP,
   MAX_POWER,
 } from "../contexts/GameContext";
-import Ball from "../components/Ball";
-import Cushions from "../components/Cushions";
-import CornerPockets from "../components/CornerPockets";
-import SidePockets from "../components/SidePockets";
-import TrajectoryLine from "../components/TrajectoryLine";
-import CueBallControl from "../components/CueBallControl";
-import PowerSlider from "../components/PowerSlider";
+import { SCENARIOS, FREE_PLAY, type Scenario } from "../engine/scenarios";
+import { DEBUG_SCENARIOS } from "../engine/debug-scenarios";
+import Ball from "./Ball";
+import Cushions from "./Cushions";
+import CornerPockets from "./CornerPockets";
+import SidePockets from "./SidePockets";
+import TrajectoryLine from "./TrajectoryLine";
+import CueBallControl from "./CueBallControl";
+import PowerSlider from "./PowerSlider";
 import { Vec2 } from "../engine/physics/vec2";
 import { strings } from "../constants/strings";
+
+const ALL = [FREE_PLAY, ...SCENARIOS, ...DEBUG_SCENARIOS];
 
 const TABLE_WIDTH_M = STANDARD_9_FOOT.width;
 const TABLE_HEIGHT_M = STANDARD_9_FOOT.height;
@@ -41,31 +42,37 @@ const DIAMOND_SIZE = 8;
 
 const CONTROLS_HEIGHT = 150;
 
-export default function TableScreen() {
-  const { scenario: scenarioId } = useLocalSearchParams<{ scenario?: string }>();
+interface TableViewProps {
+  scenarioId: string;
+}
+
+export default function TableView({ scenarioId }: TableViewProps) {
+  const scenario = useMemo(() => ALL.find((s) => s.id === scenarioId), [scenarioId]);
 
   const initialBalls = useMemo(() => {
-    if (!scenarioId) return [];
-    const all = [...SCENARIOS, ...DEBUG_SCENARIOS];
-    const scenario = all.find((s) => s.id === scenarioId);
     if (!scenario) return [];
     return scenario.createBalls();
-  }, [scenarioId]);
+  }, [scenario]);
 
   return (
     <GameProvider initialBalls={initialBalls}>
-      <TableContent scenarioId={scenarioId} />
+      <TableContent hasControls={!!scenario} />
     </GameProvider>
   );
 }
 
-function TableContent({ scenarioId }: { scenarioId?: string }) {
+export function getScenarioTitle(scenarioId: string): string {
+  const scenario = ALL.find((s) => s.id === scenarioId);
+  return scenario?.name ?? "Table";
+}
+
+function TableContent({ hasControls }: { hasControls: boolean }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { mode, balls, trajectories, trajectoryBallNumbers } = useGame();
   const { setTarget, aimAtPoint } = useGameDispatch();
 
   const padding = 24;
-  const controlsSpace = scenarioId ? CONTROLS_HEIGHT + 16 : 0;
+  const controlsSpace = hasControls ? CONTROLS_HEIGHT + 16 : 0;
 
   const CT_M = CUSHION_THICKNESS_INCHES * INCHES_TO_M;
   const k = CT_M / TABLE_HEIGHT_M;
@@ -174,7 +181,6 @@ function TableContent({ scenarioId }: { scenarioId?: string }) {
           cushionThickness={CUSHION_THICKNESS}
           scale={scaleX}
         />
-        {/* Cloth lines — long side (31 horizontal) */}
         {Array.from({ length: 31 }, (_, i) => (
           <View
             key={`hl-${i}`}
@@ -188,7 +194,6 @@ function TableContent({ scenarioId }: { scenarioId?: string }) {
             }}
           />
         ))}
-        {/* Cloth lines — short side (15 vertical) */}
         {Array.from({ length: 15 }, (_, i) => (
           <View
             key={`vl-${i}`}
@@ -237,7 +242,7 @@ function TableContent({ scenarioId }: { scenarioId?: string }) {
         ))}
       </Pressable>
 
-      {scenarioId && <Controls />}
+      {hasControls && <Controls />}
     </View>
   );
 }

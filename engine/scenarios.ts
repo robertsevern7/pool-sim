@@ -59,15 +59,37 @@ function createRack(): BallState[] {
 
 // ── User scenarios ───────────────────────────────────────────────────
 
+// Free play is accessed directly from the home screen, not listed in the scenarios grid
+export const FREE_PLAY = scenario("free_play", () => {
+  const baulkX = TABLE.width / 4;
+  const rack = createRack();
+  const apex = rack[0];
+  const dx = apex.pos[0] - baulkX;
+  const dy = apex.pos[1] - CY;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  const cue = cueStrike([baulkX, CY], [dx / len, dy / len], 4.0, 0.15);
+  return [cue, ...rack];
+});
+
+/** Scenarios shown in the scenarios grid */
 export const SCENARIOS: Scenario[] = [
-  scenario("free_play", () => {
-    const baulkX = TABLE.width / 4;
-    const rack = createRack();
-    const apex = rack[0];
-    const dx = apex.pos[0] - baulkX;
-    const dy = apex.pos[1] - CY;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const cue = cueStrike([baulkX, CY], [dx / len, dy / len], 4.0, 0.15);
-    return [cue, ...rack];
+  scenario("random", () => {
+    const margin = R * 3;
+    const minDist = R * 2.5;
+    const positions: [number, number][] = [];
+
+    // Place balls randomly, rejecting overlaps
+    while (positions.length < 16) {
+      const x = margin + Math.random() * (TABLE.width - 2 * margin);
+      const y = margin + Math.random() * (TABLE.height - 2 * margin);
+      const tooClose = positions.some(
+        (p) => Math.sqrt((p[0] - x) ** 2 + (p[1] - y) ** 2) < minDist,
+      );
+      if (!tooClose) positions.push([x, y]);
+    }
+
+    const cue = new BallState(positions[0], [0, 0], 0, MotionState.STOPPED, 0);
+    const balls = positions.slice(1).map((pos, i) => obj(pos, i + 1));
+    return [cue, ...balls];
   }),
 ];

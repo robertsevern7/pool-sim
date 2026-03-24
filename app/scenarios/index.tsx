@@ -1,14 +1,14 @@
 import { View, Text, StyleSheet, Pressable, FlatList } from "react-native";
 import { useRouter } from "expo-router";
-import { DEBUG_SCENARIOS } from "../engine/debug-scenarios";
+import { SCENARIOS } from "../../engine/scenarios";
 
-export default function DebugScenariosScreen() {
+export default function ScenariosScreen() {
   const router = useRouter();
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={DEBUG_SCENARIOS}
+        data={SCENARIOS}
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.grid}
@@ -16,7 +16,7 @@ export default function DebugScenariosScreen() {
         renderItem={({ item }) => (
           <Pressable
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-            onPress={() => router.push({ pathname: "/table", params: { scenario: item.id } })}
+            onPress={() => router.push(`/scenarios/${item.id}`)}
           >
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardDesc}>{item.description}</Text>
@@ -28,17 +28,9 @@ export default function DebugScenariosScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#1e1e1e",
-  },
-  grid: {
-    padding: 16,
-  },
-  row: {
-    gap: 12,
-    marginBottom: 12,
-  },
+  container: { flex: 1, backgroundColor: "#1e1e1e" },
+  grid: { padding: 16 },
+  row: { gap: 12, marginBottom: 12 },
   card: {
     flex: 1,
     backgroundColor: "#006432",
@@ -47,17 +39,7 @@ const styles = StyleSheet.create({
     minHeight: 100,
     justifyContent: "center",
   },
-  cardPressed: {
-    opacity: 0.7,
-  },
-  cardTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  cardDesc: {
-    color: "rgba(255,255,255,0.7)",
-    fontSize: 12,
-  },
+  cardPressed: { opacity: 0.7 },
+  cardTitle: { color: "#fff", fontSize: 16, fontWeight: "700", marginBottom: 4 },
+  cardDesc: { color: "rgba(255,255,255,0.7)", fontSize: 12 },
 });
