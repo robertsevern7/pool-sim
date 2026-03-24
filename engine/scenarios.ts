@@ -32,7 +32,7 @@ function scenario(id: ScenarioId, createBalls: () => BallState[]): Scenario {
 
 function createRack(): BallState[] {
   const footSpot: [number, number] = [TABLE.width * 3 / 4, CY];
-  const rowGap = R * Math.sqrt(3) * 2; // center-to-center row distance
+  const rowGap = R * Math.sqrt(3); // center-to-center row distance (close-packed)
 
   // Standard 8-ball rack layout (apex to back):
   // Row 0: 1
