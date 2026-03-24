@@ -9,6 +9,9 @@ export default function Index() {
       <Link href={{ pathname: "/table", params: { scenario: "free_play" } }} style={styles.link}>
         <Text style={styles.linkText}>{strings.home.goToTable}</Text>
       </Link>
+      <Link href="/scenarios" style={[styles.link, { marginTop: 12 }]}>
+        <Text style={styles.linkText}>{strings.home.scenarios}</Text>
+      </Link>
       <Link href="/debug-scenarios" style={[styles.link, { marginTop: 12 }]}>
         <Text style={styles.linkText}>{strings.home.debugScenarios}</Text>
       </Link>

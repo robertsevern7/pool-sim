@@ -1,14 +1,14 @@
 import { View, Text, StyleSheet, Pressable, FlatList } from "react-native";
 import { useRouter } from "expo-router";
-import { DEBUG_SCENARIOS } from "../engine/debug-scenarios";
+import { SCENARIOS } from "../engine/scenarios";
 
-export default function DebugScenariosScreen() {
+export default function ScenariosScreen() {
   const router = useRouter();
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={DEBUG_SCENARIOS}
+        data={SCENARIOS}
         numColumns={2}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.grid}

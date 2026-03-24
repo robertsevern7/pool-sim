@@ -2,7 +2,8 @@ import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-na
 import { useLocalSearchParams } from "expo-router";
 import { useMemo, useCallback, useRef } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
-import { ALL_SCENARIOS } from "../engine/scenarios";
+import { SCENARIOS } from "../engine/scenarios";
+import { DEBUG_SCENARIOS } from "../engine/debug-scenarios";
 import {
   GameProvider,
   useGame,
@@ -45,7 +46,8 @@ export default function TableScreen() {
 
   const initialBalls = useMemo(() => {
     if (!scenarioId) return [];
-    const scenario = ALL_SCENARIOS.find((s) => s.id === scenarioId);
+    const all = [...SCENARIOS, ...DEBUG_SCENARIOS];
+    const scenario = all.find((s) => s.id === scenarioId);
     if (!scenario) return [];
     return scenario.createBalls();
   }, [scenarioId]);

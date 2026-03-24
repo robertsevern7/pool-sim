@@ -4,11 +4,13 @@ export const strings = {
   },
   home: {
     goToTable: "Go to the Table",
+    scenarios: "Scenarios",
     debugScenarios: "Debug Scenarios",
   },
   screens: {
     home: "Home",
     table: "Table",
+    scenarios: "Scenarios",
     debugScenarios: "Debug Scenarios",
   },
   table: {

@@ -11,6 +11,7 @@ export default function RootLayout() {
     >
       <Stack.Screen name="index" options={{ title: strings.screens.home }} />
       <Stack.Screen name="table" options={{ title: strings.screens.table }} />
+      <Stack.Screen name="scenarios" options={{ title: strings.screens.scenarios }} />
       <Stack.Screen name="debug-scenarios" options={{ title: strings.screens.debugScenarios }} />
     </Stack>
   );
