@@ -213,3 +213,77 @@ test("resolve event rail collision bottom wall", () => {
   expect(q3(ball.vel[0])).toBe("0.000");
   expect(q3(ball.vel[1])).toBe("2.460");
 });
+
+// ── contact chain resolution ──
+
+const D = 2 * BALL_RADIUS; // center-to-center distance for touching balls
+
+test("chain resolution: three balls in a line", () => {
+  // A hits B which is touching C, all in a line along x-axis
+  const a = new BallState([0.0, 0.0], [3.0, 0.0], 0.0, MotionState.SLIDING);
+  const b = new BallState([D, 0.0] as [number, number], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const c = new BallState([D * 2, 0.0] as [number, number], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const state = new SimulationState([a, b, c], 0.0);
+  const event: Event = { time: 0, eventType: "BALL_COLLISION", a: 0, b: 1 };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+
+  // Energy should propagate through: A stops, B stops, C gets the velocity
+  expect(q3(a.vel[0])).toBe("0.000");
+  expect(q3(b.vel[0])).toBe("0.000");
+  expect(q3(c.vel[0])).toBe("3.000");
+});
+
+test("chain resolution: momentum conserved through chain", () => {
+  const a = new BallState([0.0, 0.0], [4.0, 0.0], 0.0, MotionState.SLIDING);
+  const b = new BallState([D, 0.0] as [number, number], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const c = new BallState([D * 2, 0.0] as [number, number], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const state = new SimulationState([a, b, c], 0.0);
+  const pBefore = add(scale(a.vel, a.mass), add(scale(b.vel, b.mass), scale(c.vel, c.mass)));
+  const event: Event = { time: 0, eventType: "BALL_COLLISION", a: 0, b: 1 };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+  const pAfter = add(scale(a.vel, a.mass), add(scale(b.vel, b.mass), scale(c.vel, c.mass)));
+  expect(q3(pAfter[0])).toBe(q3(pBefore[0]));
+  expect(q3(pAfter[1])).toBe(q3(pBefore[1]));
+});
+
+test("chain resolution: break-like triangle rack", () => {
+  // Cue hits apex ball which touches two balls behind it (triangle formation)
+  const rowGap = BALL_RADIUS * Math.sqrt(3);
+  const a = new BallState([0.0, 0.0], [3.0, 0.0], 0.0, MotionState.SLIDING); // cue
+  const b = new BallState([D, 0.0] as [number, number], [0.0, 0.0], 0.0, MotionState.STOPPED); // apex
+  const c = new BallState(
+    [D + rowGap, -BALL_RADIUS] as [number, number], [0.0, 0.0], 0.0, MotionState.STOPPED,
+  );
+  const d = new BallState(
+    [D + rowGap, BALL_RADIUS] as [number, number], [0.0, 0.0], 0.0, MotionState.STOPPED,
+  );
+  const state = new SimulationState([a, b, c, d], 0.0);
+  const event: Event = { time: 0, eventType: "BALL_COLLISION", a: 0, b: 1 };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+
+  // All balls that received energy should be moving
+  expect(norm(c.vel)).toBeGreaterThan(0.1);
+  expect(norm(d.vel)).toBeGreaterThan(0.1);
+
+  // Momentum conserved
+  const totalP = state.balls.reduce(
+    (p, ball) => add(p, scale(ball.vel, ball.mass)),
+    [0, 0] as [number, number],
+  );
+  expect(totalP[0]).toBeCloseTo(3.0 * a.mass, 4);
+  expect(totalP[1]).toBeCloseTo(0, 4);
+});
+
+test("chain resolution: no effect on separated balls", () => {
+  // A hits B, C is far away — C should not be affected
+  const a = new BallState([0.0, 0.0], [3.0, 0.0], 0.0, MotionState.SLIDING);
+  const b = new BallState([D, 0.0] as [number, number], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const c = new BallState([1.0, 1.0], [0.0, 0.0], 0.0, MotionState.STOPPED); // far away
+  const state = new SimulationState([a, b, c], 0.0);
+  const event: Event = { time: 0, eventType: "BALL_COLLISION", a: 0, b: 1 };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+
+  expect(c.vel[0]).toBe(0);
+  expect(c.vel[1]).toBe(0);
+  expect(c.motion).toBe(MotionState.STOPPED);
+});
