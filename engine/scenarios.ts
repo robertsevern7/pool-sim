@@ -30,6 +30,13 @@ function scenario(id: ScenarioId, createBalls: () => BallState[]): Scenario {
 
 // ── Standard 8-ball rack ─────────────────────────────────────────────
 
+/** Random offset simulating imperfect rack — ±JITTER meters per ball */
+const RACK_JITTER = 0.0005; // 0.5mm
+
+function jitter(): number {
+  return (Math.random() - 0.5) * 2 * RACK_JITTER;
+}
+
 function createRack(): BallState[] {
   const footSpot: [number, number] = [TABLE.width * 3 / 4, CY];
   const rowGap = R * Math.sqrt(3); // center-to-center row distance (close-packed)
@@ -55,7 +62,7 @@ function createRack(): BallState[] {
     const startY = footSpot[1] - (count - 1) * R;
     for (let col = 0; col < count; col++) {
       const y = startY + col * R * 2;
-      balls.push(obj([x, y], rows[row][col]));
+      balls.push(obj([x + jitter(), y + jitter()], rows[row][col]));
     }
   }
   return balls;

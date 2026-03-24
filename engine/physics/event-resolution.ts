@@ -48,7 +48,7 @@ function resolveBallCollision(a: BallState, b: BallState): void {
  * no approaching contacts remain.
  */
 function resolveContactChain(state: SimulationState, seedA: number, seedB: number): void {
-  const maxIterations = 100;
+  const maxIterations = 1000;
 
   // Start by checking all pairs that include the two initially colliding balls
   const dirty = new Set<number>([seedA, seedB]);
