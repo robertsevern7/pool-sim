@@ -26,7 +26,7 @@ export const MAX_POWER = 5.0; // m/s
 
 // ── Types ────────────────────────────────────────────────────────────
 
-type Mode = "preview" | "playing" | "done";
+type Mode = "placing" | "preview" | "playing" | "done";
 
 interface InternalState {
   mode: Mode;
@@ -61,6 +61,9 @@ export interface GameDispatch {
   adjustAngle: (delta: number) => void;
   setPower: (power: number) => void;
   setSpin: (spin: number) => void;
+  placeCue: (pos: Vec2) => void;
+  moveCue: (pos: Vec2) => void;
+  finishMoveCue: () => void;
 }
 
 // ── Contexts ─────────────────────────────────────────────────────────
@@ -71,7 +74,10 @@ const GameDispatchContext = createContext<GameDispatch | null>(null);
 // ── Reducer ──────────────────────────────────────────────────────────
 
 type Action =
-  | { type: "LOAD_SCENARIO"; balls: BallState[] }
+  | { type: "LOAD_SCENARIO"; balls: BallState[]; placeCue?: boolean }
+  | { type: "PLACE_CUE"; pos: Vec2 }
+  | { type: "MOVE_CUE"; pos: Vec2 }
+  | { type: "FINISH_MOVE_CUE" }
   | { type: "SET_TARGET"; ballIndex: number }
   | { type: "AIM_AT_POINT"; point: Vec2 }
   | { type: "ADJUST_ANGLE"; delta: number }
@@ -159,6 +165,21 @@ function previewFromFinalPositions(state: InternalState): InternalState {
 function reducer(state: InternalState, action: Action): InternalState {
   switch (action.type) {
     case "LOAD_SCENARIO": {
+      if (action.placeCue) {
+        // No cue ball yet — enter placing mode
+        return {
+          mode: "placing",
+          initialBalls: action.balls,
+          cueSpin: 0,
+          power: 2.5,
+          targetBallIndex: null,
+          aimDirection: null,
+          aimAngleOffset: 0,
+          frames: [],
+          frameIndex: 0,
+          trajectories: [],
+        };
+      }
       const { speed, spin } = extractCueParams(action.balls[0]);
       const frames = recordSimulation(action.balls, STANDARD_9_FOOT);
       const trajectories = recordTrajectories(action.balls, STANDARD_9_FOOT);
@@ -174,6 +195,46 @@ function reducer(state: InternalState, action: Action): InternalState {
         frameIndex: 0,
         trajectories,
       };
+    }
+
+    case "PLACE_CUE": {
+      if (state.mode !== "placing") return state;
+      const cue = new BallState(
+        action.pos as [number, number],
+        [0, 0], 0, MotionState.STOPPED, 0,
+      );
+      const newBalls = [cue, ...state.initialBalls];
+      const targetIdx = newBalls.length > 1 ? 1 : null;
+      return recomputeSimulation({
+        ...state,
+        mode: "preview",
+        initialBalls: newBalls,
+        targetBallIndex: targetIdx,
+      });
+    }
+
+    case "MOVE_CUE": {
+      if (state.mode !== "preview" && state.mode !== "done") return state;
+      const cueBallIdx = state.initialBalls.findIndex((b) => b.number === 0);
+      if (cueBallIdx === -1) return state;
+      const updated = state.initialBalls.map((b, i) =>
+        i === cueBallIdx
+          ? new BallState(action.pos as [number, number], [0, 0], 0, MotionState.STOPPED, 0)
+          : b,
+      );
+      // Just update position — no simulation recompute (too expensive during drag)
+      return {
+        ...state,
+        mode: "preview",
+        initialBalls: updated,
+        frames: [],
+        trajectories: [],
+      };
+    }
+
+    case "FINISH_MOVE_CUE": {
+      if (state.mode !== "preview") return state;
+      return recomputeSimulation(state);
     }
 
     case "SET_TARGET": {
@@ -279,18 +340,19 @@ const INITIAL_STATE: InternalState = {
 
 interface GameProviderProps {
   initialBalls: BallState[];
+  placeCue?: boolean;
   children: ReactNode;
 }
 
-export function GameProvider({ initialBalls, children }: GameProviderProps) {
+export function GameProvider({ initialBalls, placeCue, children }: GameProviderProps) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (initialBalls.length > 0) {
-      dispatch({ type: "LOAD_SCENARIO", balls: initialBalls });
+      dispatch({ type: "LOAD_SCENARIO", balls: initialBalls, placeCue });
     }
-  }, [initialBalls]);
+  }, [initialBalls, placeCue]);
 
   useEffect(() => {
     if (state.mode !== "playing") {
@@ -341,6 +403,9 @@ export function GameProvider({ initialBalls, children }: GameProviderProps) {
     adjustAngle: useCallback((delta: number) => dispatch({ type: "ADJUST_ANGLE", delta }), []),
     setPower: useCallback((power: number) => dispatch({ type: "SET_POWER", power }), []),
     setSpin: useCallback((spin: number) => dispatch({ type: "SET_SPIN", spin }), []),
+    placeCue: useCallback((pos: Vec2) => dispatch({ type: "PLACE_CUE", pos }), []),
+    moveCue: useCallback((pos: Vec2) => dispatch({ type: "MOVE_CUE", pos }), []),
+    finishMoveCue: useCallback(() => dispatch({ type: "FINISH_MOVE_CUE" }), []),
   };
 
   return (

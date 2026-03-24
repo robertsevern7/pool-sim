@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, PanResponder, useWindowDimensions } from "react-native";
 import { useMemo, useCallback, useRef } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import {
@@ -55,7 +55,7 @@ export default function TableView({ scenarioId }: TableViewProps) {
   }, [scenario]);
 
   return (
-    <GameProvider initialBalls={initialBalls}>
+    <GameProvider initialBalls={initialBalls} placeCue={scenario?.placeCue}>
       <TableContent hasControls={!!scenario} />
     </GameProvider>
   );
@@ -69,7 +69,8 @@ export function getScenarioTitle(scenarioId: string): string {
 function TableContent({ hasControls }: { hasControls: boolean }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { mode, balls, trajectories, trajectoryBallNumbers } = useGame();
-  const { setTarget, aimAtPoint } = useGameDispatch();
+  const { setTarget, placeCue, moveCue, finishMoveCue } = useGameDispatch();
+  const isPlacing = mode === "placing";
 
   const padding = 24;
   const controlsSpace = hasControls ? CONTROLS_HEIGHT + 16 : 0;
@@ -108,18 +109,57 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
   );
 
   const tableRef = useRef<View>(null);
-  const handleTablePress = useCallback(
-    (e: { nativeEvent: { pageX: number; pageY: number } }) => {
-      tableRef.current?.measure((_x, _y, _w, _h, pageOffsetX, pageOffsetY) => {
-        const localX = e.nativeEvent.pageX - pageOffsetX;
-        const localY = e.nativeEvent.pageY - pageOffsetY;
-        const physX = (localY - border) / scaleY;
-        const physY = (localX - border) / scaleX;
-        aimAtPoint([physX, physY]);
-      });
-    },
-    [scaleX, scaleY, border, aimAtPoint],
-  );
+
+  // Keep refs fresh for PanResponder closures
+  const stateRef = useRef({ isPlacing, canAim: false, balls, placeCue, moveCue, finishMoveCue, scaleX, scaleY });
+  stateRef.current = { isPlacing, canAim: mode === "preview" || mode === "done", balls, placeCue, moveCue, finishMoveCue, scaleX, scaleY };
+
+  const draggingCueRef = useRef(false);
+  const dragStartPosRef = useRef<Vec2>([0, 0]);
+
+  const tablePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => {
+        const s = stateRef.current;
+        if (s.isPlacing) return true;
+        if (!s.canAim) return false;
+        return !!s.balls.find((b) => b.number === 0);
+      },
+      onMoveShouldSetPanResponder: () => draggingCueRef.current,
+      onPanResponderGrant: () => {
+        const s = stateRef.current;
+        if (s.isPlacing) {
+          // Place at table center as starting point — drag will move it
+          const cueBall = s.balls.find((b) => b.number === 0);
+          if (!cueBall) {
+            s.placeCue([STANDARD_9_FOOT.width / 4, STANDARD_9_FOOT.height / 2]);
+          }
+          dragStartPosRef.current = [STANDARD_9_FOOT.width / 4, STANDARD_9_FOOT.height / 2];
+        } else {
+          const cueBall = s.balls.find((b) => b.number === 0);
+          if (cueBall) dragStartPosRef.current = [cueBall.pos[0], cueBall.pos[1]];
+        }
+        draggingCueRef.current = true;
+      },
+      onPanResponderMove: (_e, gesture) => {
+        if (!draggingCueRef.current) return;
+        const s = stateRef.current;
+        const start = dragStartPosRef.current;
+        // dx maps to physics Y (table short axis), dy maps to physics X (table long axis)
+        const newPos: Vec2 = [
+          start[0] + gesture.dy / s.scaleY,
+          start[1] + gesture.dx / s.scaleX,
+        ];
+        s.moveCue(newPos);
+      },
+      onPanResponderRelease: () => {
+        if (draggingCueRef.current) {
+          stateRef.current.finishMoveCue();
+        }
+        draggingCueRef.current = false;
+      },
+    }),
+  ).current;
 
   const rc = RAIL_THICKNESS / 2 - DIAMOND_SIZE / 2;
   const d = DIAMOND_SIZE / 2;
@@ -141,9 +181,9 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
 
   return (
     <View style={styles.container}>
-      <Pressable
+      <View
         ref={tableRef}
-        onPress={canAim ? handleTablePress : undefined}
+        {...tablePanResponder.panHandlers}
         style={[
           styles.rail,
           {
@@ -240,9 +280,15 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
             }
           />
         ))}
-      </Pressable>
+      </View>
 
-      {hasControls && <Controls />}
+      {hasControls && (
+        isPlacing
+          ? <View style={styles.controlBar}>
+              <Text style={styles.placingText}>Tap the table to place the white ball</Text>
+            </View>
+          : <Controls />
+      )}
     </View>
   );
 }
@@ -319,6 +365,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#f5f0dc",
+  },
+  placingText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
   },
   rail: {
     backgroundColor: RAIL_COLOR,

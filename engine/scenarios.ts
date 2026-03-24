@@ -16,11 +16,17 @@ export interface Scenario {
   name: string;
   description: string;
   createBalls: () => BallState[];
+  /** If true, user must place the cue ball before playing */
+  placeCue?: boolean;
 }
 
-export function scenario(id: ScenarioId, createBalls: () => BallState[]): Scenario {
+export function scenario(
+  id: ScenarioId,
+  createBalls: () => BallState[],
+  options?: { placeCue?: boolean },
+): Scenario {
   const { name, description } = strings.scenarios[id];
-  return { id, name, description, createBalls };
+  return { id, name, description, createBalls, ...options };
 }
 
 // ── Standard 8-ball rack ─────────────────────────────────────────────
@@ -78,8 +84,8 @@ export const SCENARIOS: Scenario[] = [
     const minDist = R * 2.5;
     const positions: [number, number][] = [];
 
-    // Place balls randomly, rejecting overlaps
-    while (positions.length < 16) {
+    // Place 15 object balls randomly, rejecting overlaps
+    while (positions.length < 15) {
       const x = margin + Math.random() * (TABLE.width - 2 * margin);
       const y = margin + Math.random() * (TABLE.height - 2 * margin);
       const tooClose = positions.some(
@@ -88,8 +94,6 @@ export const SCENARIOS: Scenario[] = [
       if (!tooClose) positions.push([x, y]);
     }
 
-    const cue = new BallState(positions[0], [0, 0], 0, MotionState.STOPPED, 0);
-    const balls = positions.slice(1).map((pos, i) => obj(pos, i + 1));
-    return [cue, ...balls];
-  }),
+    return positions.map((pos, i) => obj(pos, i + 1));
+  }, { placeCue: true }),
 ];
