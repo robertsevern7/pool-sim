@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import { useState } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS } from "../engine/physics/constants";
 import { getBallVisual } from "../engine/balls";
 import type { SnapshotBall } from "../contexts/GameContext";
@@ -6,9 +7,8 @@ import { strings } from "../constants/strings";
 
 const TABLE_W = STANDARD_9_FOOT.width;
 const TABLE_H = STANDARD_9_FOOT.height;
-
-const THUMB_HEIGHT = 100;
-const THUMB_WIDTH = THUMB_HEIGHT * (TABLE_H / TABLE_W);
+const ASPECT = TABLE_H / TABLE_W;
+const LABEL_HEIGHT = 20;
 
 /** "latest" is a special selection meaning the tip/current state */
 export type CarouselSelection = number | "latest" | null;
@@ -30,6 +30,11 @@ export default function ShotHistoryCarousel({
   onReplay,
   canReplay,
 }: ShotHistoryCarouselProps) {
+  const [containerHeight, setContainerHeight] = useState(0);
+  const measured = containerHeight > 0;
+  const thumbHeight = measured ? containerHeight - LABEL_HEIGHT - 8 : 80;
+  const thumbWidth = thumbHeight * ASPECT;
+
   if (snapshots.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -39,66 +44,69 @@ export default function ShotHistoryCarousel({
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.carouselRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scroll}
-          style={styles.scrollContainer}
-        >
-          {snapshots.map((snapshot, i) => (
+    <View
+      style={styles.container}
+      onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
+    >
+      <View style={[styles.carouselRow, !measured && { opacity: 0 }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.scroll}
+            style={styles.scrollContainer}
+          >
+            {snapshots.map((snapshot, i) => (
+              <Pressable
+                key={i}
+                style={({ pressed }) => [
+                  styles.card,
+                  pressed && styles.pressed,
+                  selectedIndex === i && styles.cardSelected,
+                ]}
+                onPress={() => onSelect(i)}
+              >
+                <TableThumbnail balls={snapshot.balls} selected={selectedIndex === i} thumbWidth={thumbWidth} thumbHeight={thumbHeight} />
+                <Text style={[styles.label, selectedIndex === i && styles.labelSelected]}>
+                  {strings.history.shot(i + 1)}
+                </Text>
+              </Pressable>
+            ))}
+            {latestSnapshot && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.card,
+                  pressed && styles.pressed,
+                  selectedIndex === "latest" && styles.cardSelected,
+                ]}
+                onPress={() => onSelect("latest")}
+              >
+                <TableThumbnail balls={latestSnapshot.balls} selected={selectedIndex === "latest"} thumbWidth={thumbWidth} thumbHeight={thumbHeight} />
+                <Text style={[styles.label, selectedIndex === "latest" && styles.labelSelected]}>
+                  {strings.history.latest}
+                </Text>
+              </Pressable>
+            )}
+          </ScrollView>
+          {canReplay && (
             <Pressable
-              key={i}
-              style={({ pressed }) => [
-                styles.card,
-                pressed && styles.pressed,
-                selectedIndex === i && styles.cardSelected,
-              ]}
-              onPress={() => onSelect(i)}
+              style={({ pressed }) => [styles.replayButton, pressed && styles.pressed]}
+              onPress={onReplay}
             >
-              <TableThumbnail balls={snapshot.balls} selected={selectedIndex === i} />
-              <Text style={[styles.label, selectedIndex === i && styles.labelSelected]}>
-                {strings.history.shot(i + 1)}
-              </Text>
-            </Pressable>
-          ))}
-          {latestSnapshot && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.card,
-                pressed && styles.pressed,
-                selectedIndex === "latest" && styles.cardSelected,
-              ]}
-              onPress={() => onSelect("latest")}
-            >
-              <TableThumbnail balls={latestSnapshot.balls} selected={selectedIndex === "latest"} />
-              <Text style={[styles.label, selectedIndex === "latest" && styles.labelSelected]}>
-                {strings.history.latest}
-              </Text>
+              <Text style={styles.replayText}>{strings.history.replayAll}</Text>
             </Pressable>
           )}
-        </ScrollView>
-        {canReplay && (
-          <Pressable
-            style={({ pressed }) => [styles.replayButton, pressed && styles.pressed]}
-            onPress={onReplay}
-          >
-            <Text style={styles.replayText}>{strings.history.replayAll}</Text>
-          </Pressable>
-        )}
       </View>
     </View>
   );
 }
 
-function TableThumbnail({ balls, selected }: { balls: SnapshotBall[]; selected: boolean }) {
-  const scaleX = THUMB_WIDTH / TABLE_H;
-  const scaleY = THUMB_HEIGHT / TABLE_W;
+function TableThumbnail({ balls, selected, thumbWidth, thumbHeight }: { balls: SnapshotBall[]; selected: boolean; thumbWidth: number; thumbHeight: number }) {
+  const scaleX = thumbWidth / TABLE_H;
+  const scaleY = thumbHeight / TABLE_W;
   const dotRadius = Math.max(BALL_RADIUS * scaleX, 2);
 
   return (
-    <View style={[styles.table, selected && styles.tableSelected, { width: THUMB_WIDTH, height: THUMB_HEIGHT }]}>
+    <View style={[styles.table, selected && styles.tableSelected, { width: thumbWidth, height: thumbHeight }]}>
       {balls.map((b) => {
         const visual = getBallVisual(b.number);
         const x = b.pos[1] * scaleX;
@@ -127,6 +135,7 @@ function TableThumbnail({ balls, selected }: { balls: SnapshotBall[]; selected: 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    height: "100%",
   },
   carouselRow: {
     flexDirection: "row",
@@ -141,7 +150,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     marginLeft: 12,
-    marginRight: 12,
   },
   replayText: {
     color: "#fff",
@@ -149,7 +157,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   scroll: {
-    paddingHorizontal: 12,
     gap: 10,
   },
   card: {

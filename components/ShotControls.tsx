@@ -10,8 +10,6 @@ import CueBallControl from "./CueBallControl";
 import PowerSlider from "./PowerSlider";
 import { strings } from "../constants/strings";
 
-const CONTROLS_HEIGHT = 150;
-
 export default function ShotControls() {
   const { mode, power, spin, rules } = useGame();
   const { shoot, adjustAngle, setPower, setSpin } = useGameDispatch();
@@ -87,9 +85,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     width: "100%",
-    height: CONTROLS_HEIGHT,
+    flex: 1,
+    height: "100%",
     paddingHorizontal: 16,
-    marginTop: 16,
+    marginTop: 8,
   },
   controlLeft: {
     flex: 1,

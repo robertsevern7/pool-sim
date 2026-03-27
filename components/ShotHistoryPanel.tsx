@@ -3,8 +3,6 @@ import { useState } from "react";
 import { useGame, useGameDispatch } from "../contexts/GameContext";
 import ShotHistoryCarousel, { type CarouselSelection } from "./ShotHistoryCarousel";
 
-const CONTROLS_HEIGHT = 150;
-
 interface ShotHistoryPanelProps {
   onDismiss: () => void;
 }
@@ -42,9 +40,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     width: "100%",
-    height: CONTROLS_HEIGHT,
-    paddingHorizontal: 16,
-    marginTop: 16,
+    flex: 1,
+    height: "100%",
+    paddingHorizontal: 24,
+    marginTop: 8,
     overflow: "hidden",
   },
 });

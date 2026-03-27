@@ -37,7 +37,7 @@ const LONG_RAIL_POSITIONS = [1, 2, 3, 5, 6, 7].map((i) => (i * SEGMENT) / TABLE_
 const SHORT_RAIL_POSITIONS = [1, 2, 3].map((i) => (i * SEGMENT) / TABLE_HEIGHT_M);
 const DIAMOND_SIZE = 8;
 
-const CONTROLS_HEIGHT = 150;
+const MIN_CONTROLS_HEIGHT = 120;
 
 interface TableViewProps {
   scenarioId: string;
@@ -78,14 +78,13 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
   }, [rules.result, rules.foul]);
 
   const padding = 24;
-  // statusBar: marginTop(8) + height(STATUS_HEIGHT)
-  // controls:  marginTop(16) + height(CONTROLS_HEIGHT)
-  const controlsSpace = hasControls ? CONTROLS_HEIGHT + STATUS_HEIGHT + 8 + 16 : 0;
+  // Reserve minimum space for status bar + controls
+  const controlsSpace = hasControls ? MIN_CONTROLS_HEIGHT + STATUS_HEIGHT + 8 + 8 : 0;
 
   const CT_M = CUSHION_THICKNESS_INCHES * INCHES_TO_M;
   const k = CT_M / TABLE_HEIGHT_M;
   const availW = screenWidth - padding * 2 - RAIL_THICKNESS * 2;
-  const availH = screenHeight - padding * 2 - RAIL_THICKNESS * 2 - controlsSpace;
+  const availH = screenHeight - RAIL_THICKNESS * 2 - controlsSpace;
 
   const maxTableW = availW / (1 + 2 * k);
   const maxTableH = availH / (1 + 2 * k * ASPECT_RATIO);
@@ -325,18 +324,18 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
       </View>
 
       {hasControls && (
-        <GameStatusBar
-          showHistory={showHistory}
-          onToggleHistory={() => setShowHistory((v) => !v)}
-        />
-      )}
-
-      {hasControls && (
-        isPlacing
-          ? <View style={{ height: CONTROLS_HEIGHT + 16 }} />
-          : showHistory
-            ? <ShotHistoryPanel onDismiss={() => setShowHistory(false)} />
-            : <ShotControls />
+        <View style={styles.bottomPanel}>
+          <GameStatusBar
+            showHistory={showHistory}
+            onToggleHistory={() => setShowHistory((v) => !v)}
+          />
+          {isPlacing
+            ? null
+            : showHistory
+              ? <ShotHistoryPanel onDismiss={() => setShowHistory(false)} />
+              : <ShotControls />
+          }
+        </View>
       )}
     </View>
   );
@@ -345,9 +344,14 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
+    paddingTop: 24,
+    paddingBottom: 24,
     alignItems: "center",
     backgroundColor: "#f5f0dc",
+  },
+  bottomPanel: {
+    flex: 1,
+    width: "100%",
   },
   rail: {
     backgroundColor: RAIL_COLOR,
