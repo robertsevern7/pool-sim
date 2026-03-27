@@ -42,6 +42,7 @@ const SHORT_RAIL_POSITIONS = [1, 2, 3].map((i) => (i * SEGMENT) / TABLE_HEIGHT_M
 const DIAMOND_SIZE = 8;
 
 const CONTROLS_HEIGHT = 150;
+const STATUS_HEIGHT = 24;
 
 interface TableViewProps {
   scenarioId: string;
@@ -74,7 +75,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
   const isPlacing = mode === "placing";
 
   const padding = 24;
-  const controlsSpace = hasControls ? CONTROLS_HEIGHT + 16 : 0;
+  const controlsSpace = hasControls ? CONTROLS_HEIGHT + STATUS_HEIGHT + 16 : 0;
 
   const CT_M = CUSHION_THICKNESS_INCHES * INCHES_TO_M;
   const k = CT_M / TABLE_HEIGHT_M;
@@ -334,23 +335,27 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
 function GameStatus() {
   const { rules } = useGame();
 
+  let content: string | null = null;
+  let extraStyle = null;
+
   if (rules.result === "win") {
-    return <Text style={[styles.statusText, styles.statusWin]}>{strings.table.youWin}</Text>;
+    content = strings.table.youWin;
+    extraStyle = styles.statusWin;
+  } else if (rules.result === "loss") {
+    content = rules.foul ?? strings.table.youLose;
+    extraStyle = styles.statusLoss;
+  } else if (rules.foul) {
+    content = strings.table.foul(rules.foul);
+    extraStyle = styles.statusFoul;
+  } else if (rules.assignedSet) {
+    content = rules.assignedSet === "solid" ? strings.table.assignedSolids : strings.table.assignedStripes;
   }
-  if (rules.result === "loss") {
-    return <Text style={[styles.statusText, styles.statusLoss]}>{rules.foul ?? strings.table.youLose}</Text>;
-  }
-  if (rules.foul) {
-    return <Text style={[styles.statusText, styles.statusFoul]}>{strings.table.foul(rules.foul)}</Text>;
-  }
-  if (rules.assignedSet) {
-    return (
-      <Text style={styles.statusText}>
-        {rules.assignedSet === "solid" ? strings.table.assignedSolids : strings.table.assignedStripes}
-      </Text>
-    );
-  }
-  return null;
+
+  return (
+    <View style={styles.statusContainer}>
+      {content && <Text style={[styles.statusText, extraStyle]}>{content}</Text>}
+    </View>
+  );
 }
 
 function Controls() {
@@ -573,11 +578,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  statusContainer: {
+    height: STATUS_HEIGHT,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   statusText: {
     fontSize: 14,
     fontWeight: "600",
     color: "#333",
-    marginTop: 8,
   },
   statusWin: {
     color: "#228B22",
