@@ -323,7 +323,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
       {hasControls && (
         isPlacing
           ? <View style={styles.controlBar}>
-              <Text style={styles.placingText}>Tap the table to place the white ball</Text>
+              <Text style={styles.placingText}>{strings.table.placeCue}</Text>
             </View>
           : <Controls />
       )}
@@ -335,18 +335,18 @@ function GameStatus() {
   const { rules } = useGame();
 
   if (rules.result === "win") {
-    return <Text style={[styles.statusText, styles.statusWin]}>You win!</Text>;
+    return <Text style={[styles.statusText, styles.statusWin]}>{strings.table.youWin}</Text>;
   }
   if (rules.result === "loss") {
-    return <Text style={[styles.statusText, styles.statusLoss]}>{rules.foul ?? "You lose"}</Text>;
+    return <Text style={[styles.statusText, styles.statusLoss]}>{rules.foul ?? strings.table.youLose}</Text>;
   }
   if (rules.foul) {
-    return <Text style={[styles.statusText, styles.statusFoul]}>Foul: {rules.foul}</Text>;
+    return <Text style={[styles.statusText, styles.statusFoul]}>{strings.table.foul(rules.foul)}</Text>;
   }
   if (rules.assignedSet) {
     return (
       <Text style={styles.statusText}>
-        You are {rules.assignedSet === "solid" ? "Solids (1-7)" : "Stripes (9-15)"}
+        {rules.assignedSet === "solid" ? strings.table.assignedSolids : strings.table.assignedStripes}
       </Text>
     );
   }
@@ -376,7 +376,7 @@ function Controls() {
       style={({ pressed }) => [styles.historyToggle, pressed && styles.buttonPressed]}
       onPress={() => { setShowHistory(!showHistory); setSelectedShot(null); }}
     >
-      <Text style={styles.historyToggleText}>{showHistory ? "Controls" : "History"}</Text>
+      <Text style={styles.historyToggleText}>{showHistory ? strings.history.controls : strings.history.history}</Text>
     </Pressable>
   ) : null;
 
@@ -402,7 +402,7 @@ function Controls() {
                 }}
               >
                 <Text style={styles.goToShotText}>
-                  {selectedShot === "latest" ? "Go to Latest" : `Go to Shot ${selectedShot + 1}`}
+                  {selectedShot === "latest" ? strings.history.goToLatest : strings.history.goToShot(selectedShot + 1)}
                 </Text>
               </Pressable>
             )}

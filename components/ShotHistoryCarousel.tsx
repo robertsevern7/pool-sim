@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { STANDARD_9_FOOT, BALL_RADIUS } from "../engine/physics/constants";
 import { getBallVisual } from "../engine/balls";
 import type { SnapshotBall } from "../contexts/GameContext";
+import { strings } from "../constants/strings";
 
 const TABLE_W = STANDARD_9_FOOT.width;
 const TABLE_H = STANDARD_9_FOOT.height;
@@ -32,7 +33,7 @@ export default function ShotHistoryCarousel({
   if (snapshots.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No shots taken yet</Text>
+        <Text style={styles.emptyText}>{strings.history.noShots}</Text>
       </View>
     );
   }
@@ -40,13 +41,13 @@ export default function ShotHistoryCarousel({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Shot History</Text>
+        <Text style={styles.title}>{strings.history.title}</Text>
         {canReplay && (
           <Pressable
             style={({ pressed }) => [styles.replayButton, pressed && styles.pressed]}
             onPress={onReplay}
           >
-            <Text style={styles.replayText}>Replay All</Text>
+            <Text style={styles.replayText}>{strings.history.replayAll}</Text>
           </Pressable>
         )}
       </View>
@@ -67,7 +68,7 @@ export default function ShotHistoryCarousel({
           >
             <TableThumbnail balls={snapshot.balls} selected={selectedIndex === i} />
             <Text style={[styles.label, selectedIndex === i && styles.labelSelected]}>
-              Shot {i + 1}
+              {strings.history.shot(i + 1)}
             </Text>
           </Pressable>
         ))}
@@ -82,7 +83,7 @@ export default function ShotHistoryCarousel({
           >
             <TableThumbnail balls={latestSnapshot.balls} selected={selectedIndex === "latest"} />
             <Text style={[styles.label, selectedIndex === "latest" && styles.labelSelected]}>
-              Latest
+              {strings.history.latest}
             </Text>
           </Pressable>
         )}

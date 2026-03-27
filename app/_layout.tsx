@@ -10,7 +10,7 @@ export default function RootLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: strings.screens.home }} />
-      <Stack.Screen name="free-play" options={{ title: "Free Play" }} />
+      <Stack.Screen name="free-play" options={{ title: strings.screens.freePlay }} />
       <Stack.Screen name="scenarios" options={{ headerShown: false }} />
       <Stack.Screen name="debug-scenarios" options={{ headerShown: false }} />
     </Stack>
