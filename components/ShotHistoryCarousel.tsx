@@ -40,8 +40,45 @@ export default function ShotHistoryCarousel({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{strings.history.title}</Text>
+      <View style={styles.carouselRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+          style={styles.scrollContainer}
+        >
+          {snapshots.map((snapshot, i) => (
+            <Pressable
+              key={i}
+              style={({ pressed }) => [
+                styles.card,
+                pressed && styles.pressed,
+                selectedIndex === i && styles.cardSelected,
+              ]}
+              onPress={() => onSelect(i)}
+            >
+              <TableThumbnail balls={snapshot.balls} selected={selectedIndex === i} />
+              <Text style={[styles.label, selectedIndex === i && styles.labelSelected]}>
+                {strings.history.shot(i + 1)}
+              </Text>
+            </Pressable>
+          ))}
+          {latestSnapshot && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.card,
+                pressed && styles.pressed,
+                selectedIndex === "latest" && styles.cardSelected,
+              ]}
+              onPress={() => onSelect("latest")}
+            >
+              <TableThumbnail balls={latestSnapshot.balls} selected={selectedIndex === "latest"} />
+              <Text style={[styles.label, selectedIndex === "latest" && styles.labelSelected]}>
+                {strings.history.latest}
+              </Text>
+            </Pressable>
+          )}
+        </ScrollView>
         {canReplay && (
           <Pressable
             style={({ pressed }) => [styles.replayButton, pressed && styles.pressed]}
@@ -51,43 +88,6 @@ export default function ShotHistoryCarousel({
           </Pressable>
         )}
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {snapshots.map((snapshot, i) => (
-          <Pressable
-            key={i}
-            style={({ pressed }) => [
-              styles.card,
-              pressed && styles.pressed,
-              selectedIndex === i && styles.cardSelected,
-            ]}
-            onPress={() => onSelect(i)}
-          >
-            <TableThumbnail balls={snapshot.balls} selected={selectedIndex === i} />
-            <Text style={[styles.label, selectedIndex === i && styles.labelSelected]}>
-              {strings.history.shot(i + 1)}
-            </Text>
-          </Pressable>
-        ))}
-        {latestSnapshot && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.card,
-              pressed && styles.pressed,
-              selectedIndex === "latest" && styles.cardSelected,
-            ]}
-            onPress={() => onSelect("latest")}
-          >
-            <TableThumbnail balls={latestSnapshot.balls} selected={selectedIndex === "latest"} />
-            <Text style={[styles.label, selectedIndex === "latest" && styles.labelSelected]}>
-              {strings.history.latest}
-            </Text>
-          </Pressable>
-        )}
-      </ScrollView>
     </View>
   );
 }
@@ -129,23 +129,20 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingVertical: 8,
   },
-  header: {
+  carouselRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    marginBottom: 8,
   },
-  title: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
+  scrollContainer: {
+    flex: 1,
   },
   replayButton: {
     backgroundColor: "#2a6a8a",
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 6,
+    marginLeft: 12,
+    marginRight: 12,
   },
   replayText: {
     color: "#fff",

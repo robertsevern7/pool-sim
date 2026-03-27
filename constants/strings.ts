@@ -31,7 +31,7 @@ export const strings = {
   history: {
     title: "Shot History",
     noShots: "No shots taken yet",
-    replayAll: "Replay All",
+    replayAll: "Replay",
     latest: "Latest",
     shot: (n: number) => `Shot ${n}`,
     goToShot: (n: number) => `Go to Shot ${n}`,
