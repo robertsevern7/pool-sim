@@ -1,13 +1,10 @@
-import { View, Text, StyleSheet, Pressable, PanResponder, useWindowDimensions } from "react-native";
+import { View, StyleSheet, PanResponder, useWindowDimensions } from "react-native";
 import { useMemo, useCallback, useRef, useState } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import {
   GameProvider,
   useGame,
   useGameDispatch,
-  FINE_AIM_STEP,
-  COARSE_AIM_STEP,
-  MAX_POWER,
 } from "../contexts/GameContext";
 import { SCENARIOS, FREE_PLAY, type Scenario } from "../engine/scenarios";
 import { DEBUG_SCENARIOS } from "../engine/debug-scenarios";
@@ -16,11 +13,10 @@ import Cushions from "./Cushions";
 import CornerPockets from "./CornerPockets";
 import SidePockets from "./SidePockets";
 import TrajectoryLine from "./TrajectoryLine";
-import CueBallControl from "./CueBallControl";
-import PowerSlider from "./PowerSlider";
-import ShotHistoryCarousel, { type CarouselSelection } from "./ShotHistoryCarousel";
+import GameStatusBar, { STATUS_HEIGHT } from "./GameStatusBar";
+import ShotControls from "./ShotControls";
+import ShotHistoryPanel from "./ShotHistoryPanel";
 import { Vec2 } from "../engine/physics/vec2";
-import { strings } from "../constants/strings";
 
 const ALL = [FREE_PLAY, ...SCENARIOS, ...DEBUG_SCENARIOS];
 
@@ -42,7 +38,6 @@ const SHORT_RAIL_POSITIONS = [1, 2, 3].map((i) => (i * SEGMENT) / TABLE_HEIGHT_M
 const DIAMOND_SIZE = 8;
 
 const CONTROLS_HEIGHT = 150;
-const STATUS_HEIGHT = 24;
 
 interface TableViewProps {
   scenarioId: string;
@@ -73,6 +68,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
   const { mode, balls, trajectories, trajectoryBallNumbers } = useGame();
   const { setTarget, placeCue, moveCue, finishMoveCue } = useGameDispatch();
   const isPlacing = mode === "placing";
+  const [showHistory, setShowHistory] = useState(false);
 
   const padding = 24;
   const controlsSpace = hasControls ? CONTROLS_HEIGHT + STATUS_HEIGHT + 16 : 0;
@@ -319,165 +315,20 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
         ))}
       </View>
 
-      <GameStatus />
+      {hasControls && (
+        <GameStatusBar
+          showHistory={showHistory}
+          onToggleHistory={() => setShowHistory((v) => !v)}
+        />
+      )}
 
       {hasControls && (
         isPlacing
-          ? <View style={styles.controlBar}>
-              <Text style={styles.placingText}>{strings.table.placeCue}</Text>
-            </View>
-          : <Controls />
+          ? <View style={{ height: CONTROLS_HEIGHT }} />
+          : showHistory
+            ? <ShotHistoryPanel onDismiss={() => setShowHistory(false)} />
+            : <ShotControls />
       )}
-    </View>
-  );
-}
-
-function GameStatus() {
-  const { rules } = useGame();
-
-  let content: string | null = null;
-  let extraStyle = null;
-
-  if (rules.result === "win") {
-    content = strings.table.youWin;
-    extraStyle = styles.statusWin;
-  } else if (rules.result === "loss") {
-    content = rules.foul ?? strings.table.youLose;
-    extraStyle = styles.statusLoss;
-  } else if (rules.foul) {
-    content = strings.table.foul(rules.foul);
-    extraStyle = styles.statusFoul;
-  } else if (rules.assignedSet) {
-    content = rules.assignedSet === "solid" ? strings.table.assignedSolids : strings.table.assignedStripes;
-  }
-
-  return (
-    <View style={styles.statusContainer}>
-      {content && <Text style={[styles.statusText, extraStyle]}>{content}</Text>}
-    </View>
-  );
-}
-
-function Controls() {
-  const { mode, power, spin, shotSnapshots, latestSnapshot, canReplay } = useGame();
-  const { shoot, adjustAngle, setPower, setSpin, restoreToShot, restoreToLatest, replay } = useGameDispatch();
-  const isPlaying = mode === "playing";
-  const [showHistory, setShowHistory] = useState(false);
-  const [selectedShot, setSelectedShot] = useState<CarouselSelection>(null);
-  const hasHistory = shotSnapshots.length > 0;
-
-  const handleCarouselSelect = (selection: number | "latest") => {
-    setSelectedShot(selection);
-    if (selection === "latest") {
-      restoreToLatest();
-    } else {
-      restoreToShot(selection);
-    }
-  };
-
-  // Toggle button — always in the same place at the bottom of the control area
-  const toggleButton = hasHistory && !isPlaying ? (
-    <Pressable
-      style={({ pressed }) => [styles.historyToggle, pressed && styles.buttonPressed]}
-      onPress={() => { setShowHistory(!showHistory); setSelectedShot(null); }}
-    >
-      <Text style={styles.historyToggleText}>{showHistory ? strings.history.controls : strings.history.history}</Text>
-    </Pressable>
-  ) : null;
-
-  if (showHistory) {
-    return (
-      <View style={styles.controlBar}>
-        <View style={styles.historyPanel}>
-          <ShotHistoryCarousel
-            snapshots={shotSnapshots}
-            latestSnapshot={latestSnapshot}
-            selectedIndex={selectedShot}
-            onSelect={handleCarouselSelect}
-            onReplay={() => { replay(); setShowHistory(false); }}
-            canReplay={canReplay}
-          />
-          <View style={styles.historyButtons}>
-            {selectedShot !== null && (
-              <Pressable
-                style={({ pressed }) => [styles.goToShotButton, pressed && styles.buttonPressed]}
-                onPress={() => {
-                  setSelectedShot(null);
-                  setShowHistory(false);
-                }}
-              >
-                <Text style={styles.goToShotText}>
-                  {selectedShot === "latest" ? strings.history.goToLatest : strings.history.goToShot(selectedShot + 1)}
-                </Text>
-              </Pressable>
-            )}
-            {toggleButton}
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.controlBar}>
-      <View style={styles.controlLeft}>
-        <CueBallControl spin={spin} onSpinChange={setSpin} disabled={isPlaying} />
-        <PowerSlider value={power / MAX_POWER} onValueChange={(v) => setPower(v * MAX_POWER)} disabled={isPlaying} />
-      </View>
-
-      <View style={styles.controlCenter}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.shootButton,
-            pressed && styles.buttonPressed,
-            isPlaying && styles.buttonDisabled,
-          ]}
-          onPress={shoot}
-          disabled={isPlaying}
-        >
-          <Text style={styles.shootButtonText}>
-            {strings.table.shoot}
-          </Text>
-        </Pressable>
-        {toggleButton}
-      </View>
-
-      <View style={styles.controlRight}>
-        <View style={[styles.aimControls, isPlaying && styles.buttonDisabled]}>
-          <View style={styles.aimRow}>
-            <Pressable
-              style={({ pressed }) => [styles.aimButton, !isPlaying && pressed && styles.buttonPressed]}
-              onPress={() => adjustAngle(-COARSE_AIM_STEP)}
-              disabled={isPlaying}
-            >
-              <Text style={styles.aimButtonText}>{strings.table.aimLeft}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.aimButton, !isPlaying && pressed && styles.buttonPressed]}
-              onPress={() => adjustAngle(COARSE_AIM_STEP)}
-              disabled={isPlaying}
-            >
-              <Text style={styles.aimButtonText}>{strings.table.aimRight}</Text>
-            </Pressable>
-          </View>
-          <View style={styles.aimRow}>
-            <Pressable
-              style={({ pressed }) => [styles.aimButtonFine, !isPlaying && pressed && styles.buttonPressed]}
-              onPress={() => adjustAngle(-FINE_AIM_STEP)}
-              disabled={isPlaying}
-            >
-              <Text style={styles.aimButtonFineText}>{strings.table.aimLeftFine}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.aimButtonFine, !isPlaying && pressed && styles.buttonPressed]}
-              onPress={() => adjustAngle(FINE_AIM_STEP)}
-              disabled={isPlaying}
-            >
-              <Text style={styles.aimButtonFineText}>{strings.table.aimRightFine}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
     </View>
   );
 }
@@ -488,12 +339,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#f5f0dc",
-  },
-  placingText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 12,
   },
   rail: {
     backgroundColor: RAIL_COLOR,
@@ -508,133 +353,5 @@ const styles = StyleSheet.create({
     width: DIAMOND_SIZE,
     height: DIAMOND_SIZE,
     backgroundColor: DIAMOND_COLOR,
-  },
-  controlBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    height: CONTROLS_HEIGHT,
-    paddingHorizontal: 16,
-    marginTop: 16,
-  },
-  controlLeft: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  controlRight: {
-    flex: 1,
-    alignItems: "flex-end",
-    justifyContent: "center",
-  },
-  shootButton: {
-    backgroundColor: "#2a6a8a",
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  buttonDisabled: {
-    opacity: 0.4,
-  },
-  shootButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  aimControls: {
-    gap: 6,
-    alignItems: "center",
-  },
-  aimRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  aimButton: {
-    backgroundColor: "#3a3a3a",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  aimButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  aimButtonFine: {
-    backgroundColor: "#555",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  aimButtonFineText: {
-    color: "#ddd",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  statusContainer: {
-    height: STATUS_HEIGHT,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-  },
-  statusWin: {
-    color: "#228B22",
-    fontSize: 18,
-  },
-  statusLoss: {
-    color: "#B22222",
-    fontSize: 18,
-  },
-  statusFoul: {
-    color: "#CC6600",
-  },
-  controlCenter: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  historyPanel: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  historyButtons: {
-    gap: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  historyToggle: {
-    backgroundColor: "#555",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  historyToggleText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  goToShotButton: {
-    backgroundColor: "#2a6a8a",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  goToShotText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
   },
 });
