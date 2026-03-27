@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable, PanResponder, useWindowDimensions } from "react-native";
-import { useMemo, useCallback, useRef } from "react";
+import { useMemo, useCallback, useRef, useState } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import {
   GameProvider,
@@ -18,6 +18,7 @@ import SidePockets from "./SidePockets";
 import TrajectoryLine from "./TrajectoryLine";
 import CueBallControl from "./CueBallControl";
 import PowerSlider from "./PowerSlider";
+import ShotHistoryCarousel, { type CarouselSelection } from "./ShotHistoryCarousel";
 import { Vec2 } from "../engine/physics/vec2";
 import { strings } from "../constants/strings";
 
@@ -126,24 +127,21 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
     PanResponder.create({
       onStartShouldSetPanResponder: (e) => {
         const s = stateRef.current;
-        console.log('[PAN] onStartShould', { isPlacing: s.isPlacing, canDragCue: s.canDragCue, canAim: s.canAim, hasCue: !!s.balls.find(b => b.number === 0), tableOffset: tablePageOffset.current });
-        if (!s.canDragCue) { console.log('[PAN] rejected: canDragCue false'); return false; }
-        if (s.isPlacing) { console.log('[PAN] accepted: placing'); return true; }
-        if (!s.canAim) { console.log('[PAN] rejected: canAim false'); return false; }
+        if (!s.canDragCue) { return false; }
+        if (s.isPlacing) { return true; }
+        if (!s.canAim) { return false; }
         const cueBall = s.balls.find((b) => b.number === 0);
-        if (!cueBall) { console.log('[PAN] rejected: no cue ball'); return false; }
+        if (!cueBall) { return false; }
         const cueScreenX = s.border + cueBall.pos[1] * s.scaleX;
         const cueScreenY = s.border + cueBall.pos[0] * s.scaleY;
         const off = tablePageOffset.current;
         const touchLocalX = e.nativeEvent.pageX - off.x;
         const touchLocalY = e.nativeEvent.pageY - off.y;
         const dist = Math.sqrt((touchLocalX - cueScreenX) ** 2 + (touchLocalY - cueScreenY) ** 2);
-        console.log('[PAN] dist check', { dist, cueScreenX, cueScreenY, touchLocalX, touchLocalY, offset: off });
         return dist < 40;
       },
-      onMoveShouldSetPanResponder: () => { console.log('[PAN] onMoveShould', draggingCueRef.current); return draggingCueRef.current; },
+      onMoveShouldSetPanResponder: () => { return draggingCueRef.current; },
       onPanResponderGrant: (e) => {
-        console.log('[PAN] GRANT');
         const s = stateRef.current;
         if (s.isPlacing) {
           // Compute tap position but don't dispatch yet — wait for release
@@ -174,7 +172,6 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
         }
       },
       onPanResponderRelease: (_e, gesture) => {
-        console.log('[PAN] RELEASE', { dx: gesture.dx, dy: gesture.dy, dragging: draggingCueRef.current });
         if (!draggingCueRef.current) return;
         draggingCueRef.current = false;
         const s = stateRef.current;
@@ -357,9 +354,64 @@ function GameStatus() {
 }
 
 function Controls() {
-  const { mode, power, spin } = useGame();
-  const { shoot, adjustAngle, setPower, setSpin } = useGameDispatch();
+  const { mode, power, spin, shotSnapshots, latestSnapshot, canReplay } = useGame();
+  const { shoot, adjustAngle, setPower, setSpin, restoreToShot, restoreToLatest, replay } = useGameDispatch();
   const isPlaying = mode === "playing";
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedShot, setSelectedShot] = useState<CarouselSelection>(null);
+  const hasHistory = shotSnapshots.length > 0;
+
+  const handleCarouselSelect = (selection: number | "latest") => {
+    setSelectedShot(selection);
+    if (selection === "latest") {
+      restoreToLatest();
+    } else {
+      restoreToShot(selection);
+    }
+  };
+
+  // Toggle button — always in the same place at the bottom of the control area
+  const toggleButton = hasHistory && !isPlaying ? (
+    <Pressable
+      style={({ pressed }) => [styles.historyToggle, pressed && styles.buttonPressed]}
+      onPress={() => { setShowHistory(!showHistory); setSelectedShot(null); }}
+    >
+      <Text style={styles.historyToggleText}>{showHistory ? "Controls" : "History"}</Text>
+    </Pressable>
+  ) : null;
+
+  if (showHistory) {
+    return (
+      <View style={styles.controlBar}>
+        <View style={styles.historyPanel}>
+          <ShotHistoryCarousel
+            snapshots={shotSnapshots}
+            latestSnapshot={latestSnapshot}
+            selectedIndex={selectedShot}
+            onSelect={handleCarouselSelect}
+            onReplay={() => { replay(); setShowHistory(false); }}
+            canReplay={canReplay}
+          />
+          <View style={styles.historyButtons}>
+            {selectedShot !== null && (
+              <Pressable
+                style={({ pressed }) => [styles.goToShotButton, pressed && styles.buttonPressed]}
+                onPress={() => {
+                  setSelectedShot(null);
+                  setShowHistory(false);
+                }}
+              >
+                <Text style={styles.goToShotText}>
+                  {selectedShot === "latest" ? "Go to Latest" : `Go to Shot ${selectedShot + 1}`}
+                </Text>
+              </Pressable>
+            )}
+            {toggleButton}
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.controlBar}>
@@ -368,19 +420,22 @@ function Controls() {
         <PowerSlider value={power / MAX_POWER} onValueChange={(v) => setPower(v * MAX_POWER)} disabled={isPlaying} />
       </View>
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.shootButton,
-          pressed && styles.buttonPressed,
-          isPlaying && styles.buttonDisabled,
-        ]}
-        onPress={shoot}
-        disabled={isPlaying}
-      >
-        <Text style={styles.shootButtonText}>
-          {strings.table.shoot}
-        </Text>
-      </Pressable>
+      <View style={styles.controlCenter}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.shootButton,
+            pressed && styles.buttonPressed,
+            isPlaying && styles.buttonDisabled,
+          ]}
+          onPress={shoot}
+          disabled={isPlaying}
+        >
+          <Text style={styles.shootButtonText}>
+            {strings.table.shoot}
+          </Text>
+        </Pressable>
+        {toggleButton}
+      </View>
 
       <View style={styles.controlRight}>
         <View style={[styles.aimControls, isPlaying && styles.buttonDisabled]}>
@@ -534,5 +589,43 @@ const styles = StyleSheet.create({
   },
   statusFoul: {
     color: "#CC6600",
+  },
+  controlCenter: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  historyPanel: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  historyButtons: {
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  historyToggle: {
+    backgroundColor: "#555",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  historyToggleText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  goToShotButton: {
+    backgroundColor: "#2a6a8a",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  goToShotText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
