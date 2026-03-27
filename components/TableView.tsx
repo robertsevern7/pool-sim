@@ -71,7 +71,9 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
   const [showHistory, setShowHistory] = useState(false);
 
   const padding = 24;
-  const controlsSpace = hasControls ? CONTROLS_HEIGHT + STATUS_HEIGHT + 16 : 0;
+  // statusBar: marginTop(8) + height(STATUS_HEIGHT)
+  // controls:  marginTop(16) + height(CONTROLS_HEIGHT)
+  const controlsSpace = hasControls ? CONTROLS_HEIGHT + STATUS_HEIGHT + 8 + 16 : 0;
 
   const CT_M = CUSHION_THICKNESS_INCHES * INCHES_TO_M;
   const k = CT_M / TABLE_HEIGHT_M;
@@ -324,7 +326,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
 
       {hasControls && (
         isPlacing
-          ? <View style={{ height: CONTROLS_HEIGHT }} />
+          ? <View style={{ height: CONTROLS_HEIGHT + 16 }} />
           : showHistory
             ? <ShotHistoryPanel onDismiss={() => setShowHistory(false)} />
             : <ShotControls />

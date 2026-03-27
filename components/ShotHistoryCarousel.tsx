@@ -126,8 +126,7 @@ function TableThumbnail({ balls, selected }: { balls: SnapshotBall[]; selected: 
 
 const styles = StyleSheet.create({
   container: {
-    width: "100%",
-    paddingVertical: 8,
+    flex: 1,
   },
   carouselRow: {
     flexDirection: "row",
