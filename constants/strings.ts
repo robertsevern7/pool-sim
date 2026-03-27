@@ -27,6 +27,7 @@ export const strings = {
     foul: (reason: string) => `Foul: ${reason}`,
     assignedSolids: "You are Solids (1-7)",
     assignedStripes: "You are Stripes (9-15)",
+    potTheEight: "Pot the 8",
   },
   history: {
     title: "Shot History",
@@ -59,6 +60,7 @@ export const strings = {
     pot_side_higher: { name: "Pot Side Higher", description: "Straight shot into side pocket from higher position" },
     pot_side_right: { name: "Pot Side Right", description: "Straight shot into right side pocket" },
     two_ball: { name: "Two Ball", description: "Cue ball and object ball — aim freely" },
+    endgame: { name: "Endgame", description: "8-ball, one solid, one stripe — finish the frame" },
   },
 } as const;
 

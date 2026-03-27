@@ -96,4 +96,13 @@ export const SCENARIOS: Scenario[] = [
 
     return positions.map((pos, i) => obj(pos, i + 1));
   }, { placeCue: true }),
+
+  scenario("endgame", () => {
+    const mid = TABLE.width / 2;
+    return [
+      obj([mid + R * 6, CY - R * 4], 8),   // 8-ball
+      obj([mid - R * 4, CY + R * 6], 3),    // solid (3)
+      obj([mid + R * 4, CY + R * 4], 11),   // stripe (11)
+    ];
+  }, { placeCue: true }),
 ];

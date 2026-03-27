@@ -1,5 +1,5 @@
 import { View, StyleSheet, PanResponder, useWindowDimensions } from "react-native";
-import { useMemo, useCallback, useRef, useState } from "react";
+import { useMemo, useCallback, useRef, useState, useEffect } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import {
   GameProvider,
@@ -65,10 +65,17 @@ export function getScenarioTitle(scenarioId: string): string {
 
 function TableContent({ hasControls }: { hasControls: boolean }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { mode, balls, trajectories, trajectoryBallNumbers } = useGame();
+  const { mode, balls, trajectories, trajectoryBallNumbers, rules } = useGame();
   const { setTarget, placeCue, moveCue, finishMoveCue } = useGameDispatch();
   const isPlacing = mode === "placing";
   const [showHistory, setShowHistory] = useState(false);
+
+  // Switch to history view when the game ends
+  useEffect(() => {
+    if (rules.result !== null) {
+      setShowHistory(true);
+    }
+  }, [rules.result]);
 
   const padding = 24;
   // statusBar: marginTop(8) + height(STATUS_HEIGHT)

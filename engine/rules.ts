@@ -75,9 +75,11 @@ export function analyzeShot(
   // Check 8-ball potted
   if (rules.eightBallPotted) {
     const mySet = rules.assignedSet;
-    const myPotted = mySet === "solid" ? rules.pottedSolids : rules.pottedStripes;
-    const needed = mySet === "solid" ? 7 : 7;
-    if (mySet === null || myPotted.length < needed) {
+    // Check if any balls of the assigned set remain on the table
+    const remainingOnTable = ballNumbersAfter.filter(
+      (n) => ballSet(n) === mySet,
+    );
+    if (mySet === null || remainingOnTable.length > 0) {
       rules.result = "loss";
       rules.foul = "8-ball potted early";
     } else {
@@ -96,9 +98,11 @@ export function analyzeShot(
   if (rules.assignedSet !== null && firstHitBallNumber !== null) {
     const hitSet = ballSet(firstHitBallNumber);
 
-    // Must hit own set first, unless all own set is potted (then must hit 8)
-    const myPotted = rules.assignedSet === "solid" ? rules.pottedSolids : rules.pottedStripes;
-    const allCleared = myPotted.length >= 7;
+    // Must hit own set first, unless no balls of own set remain (then must hit 8)
+    const myRemaining = ballNumbersBefore.filter(
+      (n) => ballSet(n) === rules.assignedSet,
+    );
+    const allCleared = myRemaining.length === 0;
 
     if (allCleared) {
       // Must hit the 8-ball

@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { useGame } from "../contexts/GameContext";
+import { ballSet } from "../engine/rules";
 import { strings } from "../constants/strings";
 
 const STATUS_HEIGHT = 24;
@@ -10,7 +11,7 @@ interface GameStatusBarProps {
 }
 
 export default function GameStatusBar({ showHistory, onToggleHistory }: GameStatusBarProps) {
-  const { rules, mode, shotSnapshots } = useGame();
+  const { rules, mode, balls, shotSnapshots } = useGame();
   const isPlaying = mode === "playing";
   const hasHistory = shotSnapshots.length > 0;
 
@@ -31,7 +32,12 @@ export default function GameStatusBar({ showHistory, onToggleHistory }: GameStat
     content = strings.table.foul(rules.foul);
     extraStyle = styles.statusFoul;
   } else if (rules.assignedSet) {
-    content = rules.assignedSet === "solid" ? strings.table.assignedSolids : strings.table.assignedStripes;
+    const myRemaining = balls.filter((b) => ballSet(b.number) === rules.assignedSet);
+    if (myRemaining.length === 0) {
+      content = strings.table.potTheEight;
+    } else {
+      content = rules.assignedSet === "solid" ? strings.table.assignedSolids : strings.table.assignedStripes;
+    }
   }
 
   return (
