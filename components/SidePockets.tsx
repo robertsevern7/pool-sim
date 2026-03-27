@@ -65,8 +65,9 @@ export default function SidePockets({ tableWidth, tableHeight, railThickness, cu
       // Rectangle filling gap between cloth arc and back semicircle
       const inset = POCKET_CONFIG.sidePocketInset * 0.0254 * scale;
       const arcX = s.cx - s.dx * inset;
-      const fillLeft = s.dx === -1 ? s.cx - oneInch : arcX;
-      const fillRight = s.dx === -1 ? arcX : s.cx + oneInch;
+      // Extend fill 1px into the semicircle to avoid subpixel gap
+      const fillLeft = s.dx === -1 ? s.cx - oneInch - 1 : arcX;
+      const fillRight = s.dx === -1 ? arcX : s.cx + oneInch + 1;
       views.push(
         <View
           key={`${s.key}-fill`}
