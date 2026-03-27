@@ -110,31 +110,49 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
 
   const tableRef = useRef<View>(null);
 
-  // Keep refs fresh for PanResponder closures
-  const stateRef = useRef({ isPlacing, canAim: false, balls, placeCue, moveCue, finishMoveCue, scaleX, scaleY });
-  stateRef.current = { isPlacing, canAim: mode === "preview" || mode === "done", balls, placeCue, moveCue, finishMoveCue, scaleX, scaleY };
+  const { shotsTaken } = useGame();
+  const canDragCue = isPlacing || shotsTaken === 0;
+
+  const stateRef = useRef({ isPlacing, canAim: false, canDragCue, balls, placeCue, moveCue, finishMoveCue, scaleX, scaleY, border });
+  stateRef.current = { isPlacing, canAim: mode === "preview" || mode === "done", canDragCue, balls, placeCue, moveCue, finishMoveCue, scaleX, scaleY, border };
 
   const draggingCueRef = useRef(false);
   const dragStartPosRef = useRef<Vec2>([0, 0]);
 
+  // Measure table offset for hit-testing cue ball proximity
+  const tablePageOffset = useRef({ x: 0, y: 0 });
+
   const tablePanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => {
+      onStartShouldSetPanResponder: (e) => {
         const s = stateRef.current;
-        if (s.isPlacing) return true;
-        if (!s.canAim) return false;
-        return !!s.balls.find((b) => b.number === 0);
+        console.log('[PAN] onStartShould', { isPlacing: s.isPlacing, canDragCue: s.canDragCue, canAim: s.canAim, hasCue: !!s.balls.find(b => b.number === 0), tableOffset: tablePageOffset.current });
+        if (!s.canDragCue) { console.log('[PAN] rejected: canDragCue false'); return false; }
+        if (s.isPlacing) { console.log('[PAN] accepted: placing'); return true; }
+        if (!s.canAim) { console.log('[PAN] rejected: canAim false'); return false; }
+        const cueBall = s.balls.find((b) => b.number === 0);
+        if (!cueBall) { console.log('[PAN] rejected: no cue ball'); return false; }
+        const cueScreenX = s.border + cueBall.pos[1] * s.scaleX;
+        const cueScreenY = s.border + cueBall.pos[0] * s.scaleY;
+        const off = tablePageOffset.current;
+        const touchLocalX = e.nativeEvent.pageX - off.x;
+        const touchLocalY = e.nativeEvent.pageY - off.y;
+        const dist = Math.sqrt((touchLocalX - cueScreenX) ** 2 + (touchLocalY - cueScreenY) ** 2);
+        console.log('[PAN] dist check', { dist, cueScreenX, cueScreenY, touchLocalX, touchLocalY, offset: off });
+        return dist < 40;
       },
-      onMoveShouldSetPanResponder: () => draggingCueRef.current,
-      onPanResponderGrant: () => {
+      onMoveShouldSetPanResponder: () => { console.log('[PAN] onMoveShould', draggingCueRef.current); return draggingCueRef.current; },
+      onPanResponderGrant: (e) => {
+        console.log('[PAN] GRANT');
         const s = stateRef.current;
         if (s.isPlacing) {
-          // Place at table center as starting point — drag will move it
-          const cueBall = s.balls.find((b) => b.number === 0);
-          if (!cueBall) {
-            s.placeCue([STANDARD_9_FOOT.width / 4, STANDARD_9_FOOT.height / 2]);
-          }
-          dragStartPosRef.current = [STANDARD_9_FOOT.width / 4, STANDARD_9_FOOT.height / 2];
+          // Compute tap position but don't dispatch yet — wait for release
+          const off = tablePageOffset.current;
+          const localX = e.nativeEvent.pageX - off.x;
+          const localY = e.nativeEvent.pageY - off.y;
+          const physX = (localY - s.border) / s.scaleY;
+          const physY = (localX - s.border) / s.scaleX;
+          dragStartPosRef.current = [physX, physY];
         } else {
           const cueBall = s.balls.find((b) => b.number === 0);
           if (cueBall) dragStartPosRef.current = [cueBall.pos[0], cueBall.pos[1]];
@@ -145,21 +163,41 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
         if (!draggingCueRef.current) return;
         const s = stateRef.current;
         const start = dragStartPosRef.current;
-        // dx maps to physics Y (table short axis), dy maps to physics X (table long axis)
-        const newPos: Vec2 = [
+        const pos: Vec2 = [
           start[0] + gesture.dy / s.scaleY,
           start[1] + gesture.dx / s.scaleX,
         ];
-        s.moveCue(newPos);
-      },
-      onPanResponderRelease: () => {
-        if (draggingCueRef.current) {
-          stateRef.current.finishMoveCue();
+        if (s.isPlacing) {
+          s.placeCue(pos);
+        } else {
+          s.moveCue(pos);
         }
+      },
+      onPanResponderRelease: (_e, gesture) => {
+        console.log('[PAN] RELEASE', { dx: gesture.dx, dy: gesture.dy, dragging: draggingCueRef.current });
+        if (!draggingCueRef.current) return;
         draggingCueRef.current = false;
+        const s = stateRef.current;
+        const start = dragStartPosRef.current;
+        const finalPos: Vec2 = [
+          start[0] + gesture.dy / s.scaleY,
+          start[1] + gesture.dx / s.scaleX,
+        ];
+        if (s.isPlacing) {
+          s.placeCue(finalPos);
+        } else {
+          s.moveCue(finalPos);
+          s.finishMoveCue();
+        }
       },
     }),
   ).current;
+
+  const onTableLayout = useCallback(() => {
+    tableRef.current?.measureInWindow((x, y) => {
+      tablePageOffset.current = { x, y };
+    });
+  }, []);
 
   const rc = RAIL_THICKNESS / 2 - DIAMOND_SIZE / 2;
   const d = DIAMOND_SIZE / 2;
@@ -183,6 +221,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
     <View style={styles.container}>
       <View
         ref={tableRef}
+        onLayout={onTableLayout}
         {...tablePanResponder.panHandlers}
         style={[
           styles.rail,

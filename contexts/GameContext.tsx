@@ -44,6 +44,7 @@ interface InternalState {
   ballNumbersBeforeShot: number[];
   firstHitBallNumber: number | null;
   railHitAfterContact: boolean;
+  shotsTaken: number;
   rules: GameRules;
 }
 
@@ -56,6 +57,7 @@ export interface GameState {
   targetBallIndex: number | null;
   power: number;
   spin: number;
+  shotsTaken: number;
   rules: GameRules;
 }
 
@@ -184,6 +186,8 @@ function reducer(state: InternalState, action: Action): InternalState {
           trajectories: [],
           ballNumbersBeforeShot: [],
           firstHitBallNumber: null,
+          railHitAfterContact: false,
+          shotsTaken: 0,
           rules: INITIAL_RULES,
         };
       }
@@ -204,6 +208,7 @@ function reducer(state: InternalState, action: Action): InternalState {
         ballNumbersBeforeShot: [],
         firstHitBallNumber: null,
         railHitAfterContact: false,
+        shotsTaken: 0,
         rules: INITIAL_RULES,
       };
     }
@@ -322,6 +327,7 @@ function reducer(state: InternalState, action: Action): InternalState {
         ballNumbersBeforeShot: ballNumbersBefore,
         firstHitBallNumber,
         railHitAfterContact,
+        shotsTaken: base.shotsTaken + 1,
       };
     }
 
@@ -447,6 +453,7 @@ export function GameProvider({ initialBalls, placeCue, children }: GameProviderP
     targetBallIndex: state.targetBallIndex,
     power: state.power,
     spin: state.cueSpin,
+    shotsTaken: state.shotsTaken,
     rules: state.rules,
   };
 
