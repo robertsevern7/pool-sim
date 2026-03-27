@@ -13,15 +13,16 @@ import { strings } from "../constants/strings";
 const CONTROLS_HEIGHT = 150;
 
 export default function ShotControls() {
-  const { mode, power, spin } = useGame();
+  const { mode, power, spin, rules } = useGame();
   const { shoot, adjustAngle, setPower, setSpin } = useGameDispatch();
   const isPlaying = mode === "playing";
+  const disabled = isPlaying || rules.foul !== null || rules.result !== null;
 
   return (
     <View style={styles.controlBar}>
       <View style={styles.controlLeft}>
-        <CueBallControl spin={spin} onSpinChange={setSpin} disabled={isPlaying} />
-        <PowerSlider value={power / MAX_POWER} onValueChange={(v) => setPower(v * MAX_POWER)} disabled={isPlaying} />
+        <CueBallControl spin={spin} onSpinChange={setSpin} disabled={disabled} />
+        <PowerSlider value={power / MAX_POWER} onValueChange={(v) => setPower(v * MAX_POWER)} disabled={disabled} />
       </View>
 
       <View style={styles.controlCenter}>
@@ -29,10 +30,10 @@ export default function ShotControls() {
           style={({ pressed }) => [
             styles.shootButton,
             pressed && styles.buttonPressed,
-            isPlaying && styles.buttonDisabled,
+            disabled && styles.buttonDisabled,
           ]}
           onPress={shoot}
-          disabled={isPlaying}
+          disabled={disabled}
         >
           <Text style={styles.shootButtonText}>
             {strings.table.shoot}
@@ -41,35 +42,35 @@ export default function ShotControls() {
       </View>
 
       <View style={styles.controlRight}>
-        <View style={[styles.aimControls, isPlaying && styles.buttonDisabled]}>
+        <View style={[styles.aimControls, disabled && styles.buttonDisabled]}>
           <View style={styles.aimRow}>
             <Pressable
-              style={({ pressed }) => [styles.aimButton, !isPlaying && pressed && styles.buttonPressed]}
+              style={({ pressed }) => [styles.aimButton, !disabled && pressed && styles.buttonPressed]}
               onPress={() => adjustAngle(-COARSE_AIM_STEP)}
-              disabled={isPlaying}
+              disabled={disabled}
             >
               <Text style={styles.aimButtonText}>{strings.table.aimLeft}</Text>
             </Pressable>
             <Pressable
-              style={({ pressed }) => [styles.aimButton, !isPlaying && pressed && styles.buttonPressed]}
+              style={({ pressed }) => [styles.aimButton, !disabled && pressed && styles.buttonPressed]}
               onPress={() => adjustAngle(COARSE_AIM_STEP)}
-              disabled={isPlaying}
+              disabled={disabled}
             >
               <Text style={styles.aimButtonText}>{strings.table.aimRight}</Text>
             </Pressable>
           </View>
           <View style={styles.aimRow}>
             <Pressable
-              style={({ pressed }) => [styles.aimButtonFine, !isPlaying && pressed && styles.buttonPressed]}
+              style={({ pressed }) => [styles.aimButtonFine, !disabled && pressed && styles.buttonPressed]}
               onPress={() => adjustAngle(-FINE_AIM_STEP)}
-              disabled={isPlaying}
+              disabled={disabled}
             >
               <Text style={styles.aimButtonFineText}>{strings.table.aimLeftFine}</Text>
             </Pressable>
             <Pressable
-              style={({ pressed }) => [styles.aimButtonFine, !isPlaying && pressed && styles.buttonPressed]}
+              style={({ pressed }) => [styles.aimButtonFine, !disabled && pressed && styles.buttonPressed]}
               onPress={() => adjustAngle(FINE_AIM_STEP)}
-              disabled={isPlaying}
+              disabled={disabled}
             >
               <Text style={styles.aimButtonFineText}>{strings.table.aimRightFine}</Text>
             </Pressable>

@@ -70,12 +70,12 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
   const isPlacing = mode === "placing";
   const [showHistory, setShowHistory] = useState(false);
 
-  // Switch to history view when the game ends
+  // Switch to history view on foul or game end
   useEffect(() => {
-    if (rules.result !== null) {
+    if (rules.result !== null || rules.foul !== null) {
       setShowHistory(true);
     }
-  }, [rules.result]);
+  }, [rules.result, rules.foul]);
 
   const padding = 24;
   // statusBar: marginTop(8) + height(STATUS_HEIGHT)
