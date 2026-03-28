@@ -1,4 +1,4 @@
-import { View, StyleSheet, PanResponder, useWindowDimensions } from "react-native";
+import { View, StyleSheet, PanResponder, Pressable, useWindowDimensions } from "react-native";
 import { useMemo, useCallback, useRef, useState, useEffect } from "react";
 import { STANDARD_9_FOOT, BALL_RADIUS, POCKET_CONFIG } from "../engine/physics/constants";
 import {
@@ -70,6 +70,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
   const { setTarget, placeCue, moveCue, finishMoveCue } = useGameDispatch();
   const isPlacing = mode === "placing";
   const [showHistory, setShowHistory] = useState(false);
+  const [showAiming, setShowAiming] = useState(true);
 
   // Switch to history view on foul or game end
   useEffect(() => {
@@ -123,6 +124,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
   const stateRef = useRef({ isPlacing, canAim: false, canDragCue, balls, placeCue, moveCue, finishMoveCue, scaleX, scaleY, border });
   stateRef.current = { isPlacing, canAim: mode === "preview" || mode === "done", canDragCue, balls, placeCue, moveCue, finishMoveCue, scaleX, scaleY, border };
 
+  const [isDraggingCue, setIsDraggingCue] = useState(false);
   const draggingCueRef = useRef(false);
   const dragStartPosRef = useRef<Vec2>([0, 0]);
 
@@ -162,6 +164,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
           if (cueBall) dragStartPosRef.current = [cueBall.pos[0], cueBall.pos[1]];
         }
         draggingCueRef.current = true;
+        setIsDraggingCue(true);
       },
       onPanResponderMove: (_e, gesture) => {
         if (!draggingCueRef.current) return;
@@ -180,6 +183,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
       onPanResponderRelease: (_e, gesture) => {
         if (!draggingCueRef.current) return;
         draggingCueRef.current = false;
+        setIsDraggingCue(false);
         const s = stateRef.current;
         const start = dragStartPosRef.current;
         const finalPos: Vec2 = [
@@ -237,7 +241,13 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
       >
         {diamonds(tableWidth, tableHeight)}
 
-        <View
+        <Pressable
+          disabled={isPlacing}
+          onPress={() => {
+            if (mode === "preview" || mode === "done") {
+              setShowAiming((v) => !v);
+            }
+          }}
           style={[
             styles.cloth,
             {
@@ -298,7 +308,7 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
           scale={scaleX}
         />
 
-        {mode === "preview" && trajectories.map((path, i) => (
+        {mode === "preview" && showAiming && !isDraggingCue && trajectories.map((path, i) => (
           <TrajectoryLine
             key={`traj-${i}`}
             path={path}
@@ -317,17 +327,19 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
             ballNumber={ball.number}
             onPress={
               canAim && ball.number !== 0
-                ? () => setTarget(i)
+                ? () => { setTarget(i); setShowAiming(true); }
                 : undefined
             }
           />
         ))}
 
-        <FloatingAimControls
-          toScreen={toScreen}
-          trajectories={trajectories}
-          ballRadius={ballRadius}
-        />
+        {showAiming && !isDraggingCue && (
+          <FloatingAimControls
+            toScreen={toScreen}
+            trajectories={trajectories}
+            ballRadius={ballRadius}
+          />
+        )}
       </View>
 
       {hasControls && (
