@@ -2,8 +2,6 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import {
   useGame,
   useGameDispatch,
-  FINE_AIM_STEP,
-  COARSE_AIM_STEP,
   MAX_POWER,
 } from "../contexts/GameContext";
 import CueBallControl from "./CueBallControl";
@@ -12,7 +10,7 @@ import { strings } from "../constants/strings";
 
 export default function ShotControls() {
   const { mode, power, spin, rules } = useGame();
-  const { shoot, adjustAngle, setPower, setSpin } = useGameDispatch();
+  const { shoot, setPower, setSpin } = useGameDispatch();
   const isPlaying = mode === "playing";
   const disabled = isPlaying || rules.foul !== null || rules.result !== null;
 
@@ -39,42 +37,7 @@ export default function ShotControls() {
         </Pressable>
       </View>
 
-      <View style={styles.controlRight}>
-        <View style={[styles.aimControls, disabled && styles.buttonDisabled]}>
-          <View style={styles.aimRow}>
-            <Pressable
-              style={({ pressed }) => [styles.aimButton, !disabled && pressed && styles.buttonPressed]}
-              onPress={() => adjustAngle(-COARSE_AIM_STEP)}
-              disabled={disabled}
-            >
-              <Text style={styles.aimButtonText}>{strings.table.aimLeft}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.aimButton, !disabled && pressed && styles.buttonPressed]}
-              onPress={() => adjustAngle(COARSE_AIM_STEP)}
-              disabled={disabled}
-            >
-              <Text style={styles.aimButtonText}>{strings.table.aimRight}</Text>
-            </Pressable>
-          </View>
-          <View style={styles.aimRow}>
-            <Pressable
-              style={({ pressed }) => [styles.aimButtonFine, !disabled && pressed && styles.buttonPressed]}
-              onPress={() => adjustAngle(-FINE_AIM_STEP)}
-              disabled={disabled}
-            >
-              <Text style={styles.aimButtonFineText}>{strings.table.aimLeftFine}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.aimButtonFine, !disabled && pressed && styles.buttonPressed]}
-              onPress={() => adjustAngle(FINE_AIM_STEP)}
-              disabled={disabled}
-            >
-              <Text style={styles.aimButtonFineText}>{strings.table.aimRightFine}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
+      <View style={styles.controlRight} />
     </View>
   );
 }
@@ -103,8 +66,6 @@ const styles = StyleSheet.create({
   },
   controlRight: {
     flex: 1,
-    alignItems: "flex-end",
-    justifyContent: "center",
   },
   shootButton: {
     backgroundColor: "#2a6a8a",
@@ -123,36 +84,6 @@ const styles = StyleSheet.create({
   shootButtonText: {
     color: "#fff",
     fontSize: 18,
-    fontWeight: "600",
-  },
-  aimControls: {
-    gap: 6,
-    alignItems: "center",
-  },
-  aimRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  aimButton: {
-    backgroundColor: "#3a3a3a",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  aimButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  aimButtonFine: {
-    backgroundColor: "#555",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  aimButtonFineText: {
-    color: "#ddd",
-    fontSize: 16,
     fontWeight: "600",
   },
 });

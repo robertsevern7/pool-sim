@@ -13,6 +13,7 @@ import Cushions from "./Cushions";
 import CornerPockets from "./CornerPockets";
 import SidePockets from "./SidePockets";
 import TrajectoryLine from "./TrajectoryLine";
+import FloatingAimControls from "./FloatingAimControls";
 import GameStatusBar, { STATUS_HEIGHT } from "./GameStatusBar";
 import ShotControls from "./ShotControls";
 import ShotHistoryPanel from "./ShotHistoryPanel";
@@ -321,6 +322,12 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
             }
           />
         ))}
+
+        <FloatingAimControls
+          toScreen={toScreen}
+          trajectories={trajectories}
+          ballRadius={ballRadius}
+        />
       </View>
 
       {hasControls && (
