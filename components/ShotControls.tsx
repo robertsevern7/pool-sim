@@ -16,28 +16,27 @@ export default function ShotControls() {
 
   return (
     <View style={styles.controlBar}>
-      <View style={styles.controlLeft}>
+      <View style={styles.side}>
         <CueBallControl spin={spin} onSpinChange={setSpin} disabled={disabled} />
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.shootButton,
+          pressed && styles.buttonPressed,
+          disabled && styles.buttonDisabled,
+        ]}
+        onPress={shoot}
+        disabled={disabled}
+      >
+        <Text style={styles.shootButtonText}>
+          {strings.table.shoot}
+        </Text>
+      </Pressable>
+
+      <View style={styles.side}>
         <PowerSlider value={power / MAX_POWER} onValueChange={(v) => setPower(v * MAX_POWER)} disabled={disabled} />
       </View>
-
-      <View style={styles.controlCenter}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.shootButton,
-            pressed && styles.buttonPressed,
-            disabled && styles.buttonDisabled,
-          ]}
-          onPress={shoot}
-          disabled={disabled}
-        >
-          <Text style={styles.shootButtonText}>
-            {strings.table.shoot}
-          </Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.controlRight} />
     </View>
   );
 }
@@ -46,26 +45,19 @@ const styles = StyleSheet.create({
   controlBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
     width: "100%",
     flex: 1,
     height: "100%",
-    paddingHorizontal: 16,
     marginTop: 8,
+    paddingHorizontal: 24,
+    gap: 24,
   },
-  controlLeft: {
+  side: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  controlCenter: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-  },
-  controlRight: {
-    flex: 1,
+    height: "100%",
   },
   shootButton: {
     backgroundColor: "#2a6a8a",

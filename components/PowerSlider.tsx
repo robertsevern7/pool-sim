@@ -1,8 +1,7 @@
-import { useRef } from "react";
-import { View, StyleSheet, PanResponder } from "react-native";
+import { useRef, useState } from "react";
+import { View, StyleSheet, PanResponder, LayoutChangeEvent } from "react-native";
 
-const TRACK_HEIGHT = 120;
-const TRACK_WIDTH = 12;
+const TRACK_THICKNESS = 12;
 const THUMB_SIZE = 22;
 
 interface PowerSliderProps {
@@ -12,10 +11,14 @@ interface PowerSliderProps {
 }
 
 export default function PowerSlider({ value, onValueChange, disabled }: PowerSliderProps) {
+  const [trackHeight, setTrackHeight] = useState(0);
+
   const callbackRef = useRef(onValueChange);
   callbackRef.current = onValueChange;
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
+  const trackHeightRef = useRef(trackHeight);
+  trackHeightRef.current = trackHeight;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -27,28 +30,33 @@ export default function PowerSlider({ value, onValueChange, disabled }: PowerSli
   ).current;
 
   function updateValue(locationY: number) {
-    const clamped = Math.max(0, Math.min(TRACK_HEIGHT, locationY));
-    const power = 1 - clamped / TRACK_HEIGHT;
+    const th = trackHeightRef.current;
+    if (th === 0) return;
+    const clamped = Math.max(0, Math.min(th, locationY));
+    const power = 1 - clamped / th;
     callbackRef.current(Math.max(0.05, power));
   }
 
-  const fillHeight = value * TRACK_HEIGHT;
-  const thumbTop = (1 - value) * TRACK_HEIGHT - THUMB_SIZE / 2;
+  const onTrackLayout = (e: LayoutChangeEvent) => {
+    setTrackHeight(e.nativeEvent.layout.height);
+  };
+
+  const fillHeight = trackHeight > 0 ? `${value * 100}%` as const : 0;
+  const thumbTop = trackHeight > 0 ? (1 - value) * trackHeight - THUMB_SIZE / 2 : 0;
 
   return (
     <View style={styles.container}>
       <View
         style={styles.track}
+        onLayout={onTrackLayout}
         {...panResponder.panHandlers}
       >
-        {/* Fill from bottom */}
         <View
           style={[
             styles.fill,
             { height: fillHeight, bottom: 0 },
           ]}
         />
-        {/* Thumb */}
         <View style={[styles.thumb, { top: thumbTop }]} />
       </View>
     </View>
@@ -57,15 +65,15 @@ export default function PowerSlider({ value, onValueChange, disabled }: PowerSli
 
 const styles = StyleSheet.create({
   container: {
-    height: TRACK_HEIGHT + THUMB_SIZE,
     width: THUMB_SIZE + 8,
+    height: "100%",
     alignItems: "center",
     justifyContent: "center",
   },
   track: {
-    width: TRACK_WIDTH,
-    height: TRACK_HEIGHT,
-    borderRadius: TRACK_WIDTH / 2,
+    width: TRACK_THICKNESS,
+    height: "100%",
+    borderRadius: TRACK_THICKNESS / 2,
     backgroundColor: "#333",
     overflow: "visible",
   },
@@ -73,7 +81,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    borderRadius: TRACK_WIDTH / 2,
+    borderRadius: TRACK_THICKNESS / 2,
     backgroundColor: "#2a6a8a",
   },
   thumb: {
@@ -84,6 +92,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 2,
     borderColor: "#2a6a8a",
-    left: (TRACK_WIDTH - THUMB_SIZE) / 2,
+    left: (TRACK_THICKNESS - THUMB_SIZE) / 2,
   },
 });

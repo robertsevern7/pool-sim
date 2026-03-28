@@ -1,10 +1,9 @@
-import { useRef } from "react";
-import { View, StyleSheet, PanResponder } from "react-native";
+import { useRef, useState } from "react";
+import { View, StyleSheet, PanResponder, LayoutChangeEvent } from "react-native";
 
-const SIZE = 70;
-const RADIUS = SIZE / 2;
-const INNER_RADIUS = RADIUS * 0.6;
-const DOT_SIZE = 10;
+const INNER_RATIO = 0.6;
+const DOT_RATIO = 10 / 70;
+const BORDER = 2;
 
 interface CueBallControlProps {
   /** Vertical spin: -1 (draw) to 1 (follow) */
@@ -14,10 +13,17 @@ interface CueBallControlProps {
 }
 
 export default function CueBallControl({ spin, onSpinChange, disabled }: CueBallControlProps) {
+  const [size, setSize] = useState(0);
+  const radius = size / 2;
+  const innerRadius = radius * INNER_RATIO;
+  const dotSize = Math.max(size * DOT_RATIO, 6);
+
   const callbackRef = useRef(onSpinChange);
   callbackRef.current = onSpinChange;
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
+  const sizeRef = useRef({ radius, innerRadius });
+  sizeRef.current = { radius, innerRadius };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -29,66 +35,70 @@ export default function CueBallControl({ spin, onSpinChange, disabled }: CueBall
   ).current;
 
   function updateSpin(locationY: number) {
-    const offsetY = locationY - RADIUS;
-    const clamped = Math.max(-INNER_RADIUS, Math.min(INNER_RADIUS, offsetY));
-    const value = -(clamped / INNER_RADIUS);
+    const s = sizeRef.current;
+    if (s.radius === 0) return;
+    const offsetY = locationY - s.radius;
+    const clamped = Math.max(-s.innerRadius, Math.min(s.innerRadius, offsetY));
+    const value = -(clamped / s.innerRadius);
     callbackRef.current(value);
   }
 
-  // Dot position: spin 1 = top of inner circle, spin -1 = bottom
-  const BORDER = 2;
-  const dotOffsetY = -spin * INNER_RADIUS;
+  const onLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    const s = Math.min(width, height);
+    setSize(s);
+  };
+
+  const dotOffsetY = -spin * innerRadius;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.ball} {...panResponder.panHandlers}>
-        {/* Inner circle guide */}
-        <View style={styles.innerCircle} />
-        {/* Hit point dot */}
+    <View style={styles.container} onLayout={onLayout}>
+      {size > 0 && (
         <View
-          style={[
-            styles.dot,
-            {
-              top: RADIUS - BORDER + dotOffsetY - DOT_SIZE / 2,
-              left: RADIUS - BORDER - DOT_SIZE / 2,
-            },
-          ]}
-        />
-      </View>
+          style={{
+            width: size,
+            height: size,
+            borderRadius: radius,
+            backgroundColor: "rgb(255, 255, 240)",
+            borderWidth: BORDER,
+            borderColor: "rgba(0, 0, 0, 0.3)",
+          }}
+          {...panResponder.panHandlers}
+        >
+          <View
+            style={{
+              position: "absolute",
+              width: innerRadius * 2,
+              height: innerRadius * 2,
+              borderRadius: innerRadius,
+              borderWidth: 1,
+              borderColor: "rgba(0, 0, 0, 0.15)",
+              top: radius - innerRadius - BORDER,
+              left: radius - innerRadius - BORDER,
+            }}
+          />
+          <View
+            style={{
+              position: "absolute",
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              backgroundColor: "rgb(200, 50, 50)",
+              top: radius - BORDER + dotOffsetY - dotSize / 2,
+              left: radius - BORDER - dotSize / 2,
+            }}
+          />
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: SIZE + 8,
-    height: SIZE + 8,
+    aspectRatio: 1,
+    height: "100%",
     justifyContent: "center",
     alignItems: "center",
-  },
-  ball: {
-    width: SIZE,
-    height: SIZE,
-    borderRadius: RADIUS,
-    backgroundColor: "rgb(255, 255, 240)",
-    borderWidth: 2,
-    borderColor: "rgba(0, 0, 0, 0.3)",
-  },
-  innerCircle: {
-    position: "absolute",
-    width: INNER_RADIUS * 2,
-    height: INNER_RADIUS * 2,
-    borderRadius: INNER_RADIUS,
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.15)",
-    top: RADIUS - INNER_RADIUS - 2,
-    left: RADIUS - INNER_RADIUS - 2,
-  },
-  dot: {
-    position: "absolute",
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
-    backgroundColor: "rgb(200, 50, 50)",
   },
 });
