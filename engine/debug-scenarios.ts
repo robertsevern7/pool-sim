@@ -193,6 +193,15 @@ export const DEBUG_SCENARIOS: Scenario[] = [
       obj([objX, CY], 1),
     ];
   }),
+  scenario("cushion_english", () => {
+    // Rail throw ("cushion english"): sidespin gives the ball-cushion contact point a
+    // tangential slip, same mechanism as ball-ball throw — kinetic friction opposes it,
+    // changing the ball's rebound angle off the rail. Same bank shot, same speed, as a
+    // spinless shot would use — only the english differs, and it lands in a very
+    // different spot after just one rail bounce. See resolveRailCollision in
+    // engine/physics/event-resolution.ts.
+    return [cueStrike([0.4, 0.4], [1, 0.6], 2.5, 0, 1.0)];
+  }),
   scenario("two_ball", () => [
     cueStrike([CUE_X, CY], [1, 0], 2.5),
     obj([OBJ_X, CY], 1),

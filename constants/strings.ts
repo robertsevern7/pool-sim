@@ -63,6 +63,7 @@ export const strings = {
     draw_creep: { name: "Draw Creep", description: "Cue ball stops dead on a full hit but draws back afterward from leftover backspin" },
     throw_off_line: { name: "Throw Off Line", description: "Cue-ball sidespin (english) throws the cut ball off the true tangent line" },
     squirt_miss: { name: "Squirt Miss", description: "Uncompensated sidespin squirts the cue ball off a dead-straight aim, missing the object ball entirely" },
+    cushion_english: { name: "Cushion English", description: "Sidespin changes the cue ball's rebound angle off a single rail bounce, landing far from a spinless bank" },
     two_ball: { name: "Two Ball", description: "Cue ball and object ball — aim freely" },
     endgame: { name: "Endgame", description: "8-ball, one solid, one stripe — finish the frame" },
     mid_game_spread: { name: "Tor Lowry Example", description: "Mid-game position — balls spread across the table" },

@@ -310,6 +310,116 @@ test("resolve rail collision sets sliding", () => {
   expect(ball.motion).toBe(MotionState.SLIDING);
 });
 
+// ── resolve_rail_collision: throw (sidespin / "cushion english") ──
+//
+// Regression coverage for adding rail spin transfer: cushion contact now has a small
+// tangential friction impulse driven by spinZ (vertical-axis spin), which changes a
+// spinning ball's rebound angle off a rail — the classic "cushion english" effect.
+// Deliberately spin-only, not tangential-velocity-based, so a spinless bounce still
+// reflects with vt exactly preserved (see "resolve rail collision angled" above).
+
+test("resolve rail collision with no sidespin has zero rail throw (regression)", () => {
+  const ball = new BallState(
+    [0.5, STANDARD_9_FOOT.height - BALL_RADIUS],
+    [2.0, 2.0],
+    [0, 0],
+    MotionState.SLIDING,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+  expect(q3(ball.vel[0])).toBe("2.000");
+  expect(q3(ball.vel[1])).toBe("-1.640");
+});
+
+test("resolve rail collision with sidespin changes the rebound angle (cushion throw)", () => {
+  const ball = new BallState(
+    [0.5, STANDARD_9_FOOT.height - BALL_RADIUS],
+    [2.0, 2.0],
+    [0, 0],
+    MotionState.SLIDING,
+    0,
+    50,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+  // Hand-derived reference values for this exact setup, cross-checked against the ball-ball
+  // throw formula (same mechanism, wall-fixed instead of a second ball).
+  expect(q3(ball.vel[0])).toBe("2.510");
+  expect(q3(ball.vel[1])).toBe("-1.640");
+  expect(q3(ball.spinZ)).toBe("5.416");
+});
+
+test("resolve rail collision throw direction flips with sidespin sign", () => {
+  function reboundTangential(spinZ: number): number {
+    const ball = new BallState(
+      [0.5, STANDARD_9_FOOT.height - BALL_RADIUS],
+      [2.0, 2.0],
+      [0, 0],
+      MotionState.SLIDING,
+      0,
+      spinZ,
+    );
+    const state = new SimulationState([ball], 0.0);
+    const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
+    resolveEvent(state, event, STANDARD_9_FOOT);
+    return ball.vel[0]; // tangential axis for this (top-wall) bounce
+  }
+
+  const baseline = reboundTangential(0);
+  const positive = reboundTangential(50);
+  const negative = reboundTangential(-50);
+  expect(positive).toBeGreaterThan(baseline);
+  expect(negative).toBeLessThan(baseline);
+  expect(q3(positive - baseline)).toBe(q3(baseline - negative));
+});
+
+test("resolve rail collision throw reduces spin-driven slip (friction opposes it)", () => {
+  const spinZBefore = 50;
+  const slipBefore = -BALL_RADIUS * spinZBefore;
+
+  const ball = new BallState(
+    [0.5, STANDARD_9_FOOT.height - BALL_RADIUS],
+    [2.0, 2.0],
+    [0, 0],
+    MotionState.SLIDING,
+    0,
+    spinZBefore,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+
+  const slipAfter = -BALL_RADIUS * ball.spinZ;
+  expect(Math.sign(slipAfter)).toBe(Math.sign(slipBefore));
+  expect(Math.abs(slipAfter)).toBeLessThan(Math.abs(slipBefore));
+});
+
+test("resolve rail collision leaves omega not quite perpendicular to vel when sidespin throws it (curves after the bounce)", () => {
+  // Side note from the TODO: since omega (follow/draw axis) is untouched by a rail bounce,
+  // a spinning ball should already curve afterward for the same reason the ball-ball
+  // curving fix works — a natural-roll ball's omega is tied to its *pre-bounce* vel
+  // direction, which the bounce changes, so omega and the new vel end up misaligned.
+  const R = BALL_RADIUS;
+  const vel0: [number, number] = [2.0, 2.0];
+  // Natural roll before impact: omega locked to the incoming velocity direction.
+  const rollOmega = scale(rotate90(vel0), 1 / R);
+  const ball = new BallState(
+    [0.5, STANDARD_9_FOOT.height - R],
+    vel0,
+    rollOmega,
+    MotionState.ROLLING,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+
+  // omega is completely untouched by the bounce (only vel/spinZ change), so it no longer
+  // points anywhere close to perpendicular to the new (reflected) vel.
+  expect(Math.abs(dot(ball.vel, ball.omega))).toBeGreaterThan(1e-3);
+});
+
 // ── resolve_event: state changes ──
 
 test("resolve event state change sliding to rolling", () => {

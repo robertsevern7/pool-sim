@@ -19,6 +19,16 @@ export const RAIL_RESTITUTION = 0.82;
 // (a cut ball gets deflected slightly off the true line by cue-ball sidespin/english).
 export const BALL_FRICTION = 0.05;
 
+// Ball-to-cushion Coulomb friction coefficient — responsible for "cushion throw"/english
+// carrying through a rail bounce, changing the rebound angle. Notably higher than
+// BALL_FRICTION (cushion rubber grips more than a ball's phenolic surface does). Measured
+// value from Mathavan, Jackson & Parkin, "A theoretical analysis of billiard ball dynamics
+// under cushion impacts" (Proc. IMechE, 2010): coefficient of sliding friction ≈ 0.14
+// (alongside a cushion coefficient of restitution ≈ 0.98 for the raw normal impact — not
+// the same thing as this engine's RAIL_RESTITUTION, which is a separate, already-tuned
+// simplification of the whole tangential-preserving bounce).
+export const RAIL_FRICTION = 0.14;
+
 export const BALL_RADIUS = 0.028575; // meters
 export const BALL_MASS = 0.17;
 

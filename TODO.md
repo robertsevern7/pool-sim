@@ -74,13 +74,32 @@ they'd change existing behavior — the deferred items from that fix's planning 
       `t !== null`. Covered by regression tests in `motion-models.test.ts`,
       `event-prediction.test.ts`, `simulator.test.ts`, and `game-reducer.test.ts` (the exact
       set-spin-then-change-aim repro).
-- [ ] **Rail contact has no spin transfer or spin-dependent throw.** `resolveRailCollision` in
-      `engine/physics/event-resolution.ts` is a pure reflection + restitution coefficient on
-      `vel`; `omega` is untouched. (Side note: because of that, a spinning ball should already
-      curve after a rail bounce too, for the same reason the ball-ball fix works — worth
-      confirming with a test once this is revisited.)
-- [ ] **No elevated-cue shots** (masse, swerve-via-elevation, jump shots) — engine is a flat 2D
-      table plane, no z-axis.
+- [x] **Rail contact has no spin transfer or spin-dependent throw.** `resolveRailCollision` in
+      `engine/physics/event-resolution.ts` now applies the same Coulomb-friction tangential
+      impulse mechanism as ball-ball throw, driven by `spinZ` alone (a spinless bounce still
+      reflects with `vt` exactly preserved, as already tested) — this is "cushion english,"
+      the classic effect where sidespin changes a ball's rebound angle off a rail. New
+      `RAIL_FRICTION` constant (0.14, notably higher than `BALL_FRICTION`'s 0.05 — cushion
+      rubber grips more than a ball's phenolic surface) is a measured value from Mathavan,
+      Jackson & Parkin's peer-reviewed cushion-impact paper (Proc. IMechE, 2010), not
+      invented. Also confirmed the side note from when this item was written: since `omega`
+      (follow/draw axis) is untouched by a rail bounce, a natural-roll ball's omega stays
+      tied to its *pre-bounce* direction, which the bounce changes — so it now visibly curves
+      afterward, for the same reason the ball-ball curving fix works. Covered by new tests in
+      `event-resolution.test.ts` (exact hand-derived numbers, sign-flip symmetry, slip
+      reduction, and the curving-after-bounce confirmation); playable via the new "Cushion
+      English" debug scenario (a single-rail bank shot lands in a very different spot with
+      sidespin than without).
+
+      Also found and fixed via this scenario: `buildAimedBalls` in `game-reducer.ts` had a
+      third bug in the same family as the `extractCueParams` squirt round-trip fix — its
+      fallback aim direction (used when there's no explicit aim and no target ball, e.g. a
+      single-ball scenario) fed the cue ball's already squirt-deflected `vel` direction
+      straight back into `cueStrike`, applying squirt a *second* time on top of itself. In
+      this case that was enough to send the ball's rebound past a corner pocket's cushion
+      gap and off into unbounded space (pockets have no physical jaws — a separate, known,
+      lower-priority limitation below — so a clipped corner just sails off-table instead of
+      rattling out). Fixed by sharing the same "undo squirt" rotation `extractCueParams`
+      already used. Covered by a regression test in `game-reducer.test.ts`; reproduced and
+      confirmed fixed both through the reducer directly and in the browser.
 - [ ] **Pockets are instant absorption, not physical jaws** — no rattle/rim-out modeling.
-- [ ] **Constant friction coefficients** (`MU_SLIDE`, `MU_ROLL`) rather than speed- or
-      cloth-condition-dependent — minor, low priority.

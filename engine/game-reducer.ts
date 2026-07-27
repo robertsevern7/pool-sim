@@ -82,17 +82,23 @@ export type Action =
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+// cueStrike deflects vel away from the aim direction by -sidespin * MAX_SQUIRT_ANGLE
+// (squirt). Given a resulting vel direction and the sidespin that produced it, this
+// recovers the original aim direction by undoing that rotation.
+function undoSquirt(velDirection: Vec2, sidespin: number): Vec2 {
+  const squirtAngle = -sidespin * MAX_SQUIRT_ANGLE;
+  return rotateByAngle(velDirection, -squirtAngle);
+}
+
 export function extractCueParams(cueBall: BallState): { speed: number; spin: number; sidespin: number } {
   const speed = norm(cueBall.vel);
   if (speed === 0) return { speed, spin: 0, sidespin: 0 };
   // spinZ = sidespin * MAX_CUE_SPIN * speed inverts directly — squirt doesn't touch spinZ.
   const sidespin = cueBall.spinZ / (MAX_CUE_SPIN * speed);
   // cueStrike's omega = rotate90(dir) * spin * MAX_CUE_SPIN * speed is set from the original
-  // aim direction, but vel is squirt-deflected away from it by -sidespin * MAX_SQUIRT_ANGLE.
-  // Undo that rotation before projecting omega back onto rotate90(dir), or `spin` would pick
-  // up an error proportional to the squirt angle.
-  const squirtAngle = -sidespin * MAX_SQUIRT_ANGLE;
-  const dir = rotateByAngle(normalize(cueBall.vel), -squirtAngle);
+  // aim direction, not the squirt-deflected vel — undo that deflection before projecting
+  // omega back onto rotate90(dir), or `spin` would pick up an error proportional to squirt.
+  const dir = undoSquirt(normalize(cueBall.vel), sidespin);
   const spinComponent = dot(cueBall.omega, rotate90(dir));
   return {
     speed,
@@ -115,7 +121,10 @@ export function buildAimedBalls(state: InternalState): BallState[] {
   } else {
     const speed = norm(cueBall.vel);
     if (speed > 0) {
-      dir = normalize(cueBall.vel);
+      // cueBall.vel is squirt-deflected from whatever direction it was originally aimed
+      // (see cueStrike) — undo that before treating it as the aim direction for the
+      // rebuild below, or re-striking would apply squirt a second time on top of itself.
+      dir = undoSquirt(normalize(cueBall.vel), state.cueSidespin);
     } else {
       dir = [1, 0];
     }

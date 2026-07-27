@@ -1,5 +1,5 @@
 import { BallState, MotionState } from "./ball-state";
-import { BALL_FRICTION, BALL_RADIUS, RAIL_RESTITUTION, Table } from "./constants";
+import { BALL_FRICTION, BALL_RADIUS, RAIL_FRICTION, RAIL_RESTITUTION, Table } from "./constants";
 import type { Event } from "./event-prediction";
 import type { SimulationState } from "./simulation-state";
 import { sub, dot, scale, norm, add, rotate90, Vec2 } from "./vec2";
@@ -130,8 +130,27 @@ function resolveRailCollision(
 ): void {
   const vn = scale(normal, dot(ball.vel, normal));
   const vt = sub(ball.vel, vn);
+  const normalImpulse = ball.mass * norm(vn) * (1 + restitution);
 
   ball.vel = sub(vt, scale(vn, restitution));
+
+  // Rail throw: sidespin (spinZ) gives the ball-cushion contact point a tangential slip,
+  // same mechanism as ball-ball throw (the horizontal-plane omega used for cloth contact
+  // only contributes a *vertical* velocity at this contact, which the table's normal force
+  // absorbs — we don't model that). This is "cushion english": a spinning ball comes off a
+  // rail at a different angle than pure geometric reflection predicts. Deliberately
+  // spin-only, not tangential-velocity-based, so a spinless bounce still reflects with vt
+  // exactly preserved, as tested elsewhere.
+  const tangentDir = rotate90(normal);
+  const slipTangential = -ball.spinZ * BALL_RADIUS;
+
+  if (Math.abs(slipTangential) > 1e-9) {
+    const tangentImpulse = -Math.sign(slipTangential) * RAIL_FRICTION * normalImpulse;
+
+    ball.vel = add(ball.vel, scale(tangentDir, tangentImpulse / ball.mass));
+    ball.spinZ += (-BALL_RADIUS * tangentImpulse) / momentOfInertia(ball.mass);
+  }
+
   ball.motion = MotionState.SLIDING;
 }
 

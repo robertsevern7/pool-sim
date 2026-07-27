@@ -270,6 +270,20 @@ describe("sidespin (english) round-trips through the reducer", () => {
     expect(aimed[0].spinZ).not.toBe(0);
   });
 
+  // Regression: buildAimedBalls's fallback direction (no target ball, no explicit aim —
+  // e.g. a single-ball scenario) used to fall back to normalize(cueBall.vel) directly. But
+  // vel is squirt-deflected away from the direction it was originally struck at, so feeding
+  // it straight back into cueStrike applied squirt a *second* time on top of itself,
+  // compounding the deflection every time SHOOT rebuilt the ball. Found via a debug scenario
+  // whose cue ball flew clean off the table after just a couple of rail bounces.
+  test("buildAimedBalls does not double-apply squirt when falling back to the ball's own vel direction", () => {
+    const original = cueStrike([CUE_X, CY], [1, 0.6], 2.5, 0, 1.0);
+    const s = loadScenario([original]);
+    const aimed = buildAimedBalls(s);
+    expect(aimed[0].vel[0]).toBeCloseTo(original.vel[0], 6);
+    expect(aimed[0].vel[1]).toBeCloseTo(original.vel[1], 6);
+  });
+
   test("a scenario shot with sidespin throws the object ball off the no-sidespin outcome", () => {
     // End-to-end regression: LOAD_SCENARIO -> SHOOT must not silently drop sidespin anywhere
     // along the way (a real bug found in recorder.ts's internal deep copy).
