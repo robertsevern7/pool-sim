@@ -199,6 +199,19 @@ test("compute next event all stopped", () => {
   expect(computeNextEvent(state, STANDARD_9_FOOT)).toBeNull();
 });
 
+test("compute next event finds a zero-time state transition (falsy-zero regression)", () => {
+  // Regression: `if (t && ...)` treats a legitimate t=0 (this ball is already exactly at
+  // the natural-roll condition, see timeSlidingToRolling) as "no event", since 0 is falsy
+  // in JS — computeNextEvent must use `t !== null` instead, or the event is silently
+  // dropped and the ball gets stuck in SLIDING forever.
+  const cue = cueStrike([0.5, 0.71], [1, 0], 2.0, 0.8);
+  const state = new SimulationState([cue], 0.0);
+  const event = computeNextEvent(state, STANDARD_9_FOOT);
+  expect(event).not.toBeNull();
+  expect(event!.eventType).toBe("STATE_CHANGE");
+  expect(event!.time).toBe(0);
+});
+
 // ── pocket detection ──
 
 const TABLE = STANDARD_9_FOOT;

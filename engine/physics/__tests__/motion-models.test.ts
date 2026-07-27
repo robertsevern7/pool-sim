@@ -1,5 +1,5 @@
 import { BallState, MotionState } from "../ball-state";
-import { G, MAX_CUE_SPIN } from "../constants";
+import { G, MAX_CUE_SPIN, MAX_SQUIRT_ANGLE } from "../constants";
 import {
   ballAcceleration,
   cueStrike,
@@ -10,7 +10,7 @@ import {
   timeToReachPoint,
   timeToTravelDistance,
 } from "../motion-models";
-import { add, norm, rotate90, scale } from "../vec2";
+import { add, dot, norm, rotate90, scale } from "../vec2";
 
 function q3(n: number): string {
   return n.toFixed(3);
@@ -102,11 +102,56 @@ test("cue strike combined spin and sidespin beyond miscue limit throws", () => {
   expect(() => cueStrike([0.5, 0.7], [1, 0], 2.0, 0.9, 0.9)).toThrow();
 });
 
-test("cue strike sidespin does not affect vel or omega", () => {
+test("cue strike sidespin does not affect omega (follow/draw axis) or speed", () => {
+  // omega is set from the tip contact geometry (the aim direction), not the resulting
+  // (squirt-deflected) path — only vel's *direction* should differ with sidespin.
   const withSidespin = cueStrike([0.5, 0.7], [1, 0], 2.0, 0.3, 0.7);
   const without = cueStrike([0.5, 0.7], [1, 0], 2.0, 0.3);
-  expect(withSidespin.vel).toEqual(without.vel);
   expect(withSidespin.omega).toEqual(without.omega);
+  expect(q3(norm(withSidespin.vel))).toBe(q3(norm(without.vel)));
+});
+
+// ── cue_strike: squirt (cue ball deflection from sidespin) ──
+
+test("cue strike with no sidespin has no squirt", () => {
+  const cue = cueStrike([0.5, 0.7], [1, 0], 2.0, 0, 0);
+  expect(q3(cue.vel[0])).toBe("2.000");
+  expect(q3(cue.vel[1])).toBe("0.000");
+});
+
+test("cue strike sidespin deflects vel away from the aim direction", () => {
+  const cue = cueStrike([0.5, 0.7], [1, 0], 2.0, 0, 0.7);
+  const angle = Math.atan2(cue.vel[1], cue.vel[0]);
+  expect(q3(angle)).toBe(q3(-0.7 * MAX_SQUIRT_ANGLE));
+  // Speed is preserved — only direction changes.
+  expect(q3(norm(cue.vel))).toBe("2.000");
+});
+
+test("cue strike squirt angle scales linearly with sidespin", () => {
+  const half = cueStrike([0.5, 0.7], [1, 0], 2.0, 0, 0.3);
+  const full = cueStrike([0.5, 0.7], [1, 0], 2.0, 0, 0.6);
+  const angleHalf = Math.atan2(half.vel[1], half.vel[0]);
+  const angleFull = Math.atan2(full.vel[1], full.vel[0]);
+  expect(q3(angleFull)).toBe(q3(2 * angleHalf));
+});
+
+test("cue strike squirt direction flips with sidespin sign", () => {
+  const positiveSidespin = cueStrike([0.5, 0.7], [1, 0], 2.0, 0, 0.5);
+  const negativeSidespin = cueStrike([0.5, 0.7], [1, 0], 2.0, 0, -0.5);
+  const anglePositive = Math.atan2(positiveSidespin.vel[1], positiveSidespin.vel[0]);
+  const angleNegative = Math.atan2(negativeSidespin.vel[1], negativeSidespin.vel[0]);
+  // Squirt deflects to the opposite side from the sidespin, so the two are mirror images.
+  expect(anglePositive).toBeLessThan(0);
+  expect(angleNegative).toBeGreaterThan(0);
+  expect(q3(anglePositive)).toBe(q3(-angleNegative));
+});
+
+test("cue strike squirt leaves omega not quite perpendicular to vel (ball curves slightly after the strike)", () => {
+  // Same mechanism as the post-collision curving fix: once vel and omega aren't exactly
+  // perpendicular, ballAcceleration's slip direction isn't colinear with vel, so the ball
+  // curves while sliding. A dot product of exactly 0 would mean no curving at all.
+  const cue = cueStrike([0.5, 0.7], [1, 0], 2.0, 0.4, 0.6);
+  expect(Math.abs(dot(cue.vel, cue.omega))).toBeGreaterThan(1e-6);
 });
 
 test("cue strike unnormalized direction", () => {
@@ -149,6 +194,18 @@ test("time sliding to rolling hard", () => {
 test("time sliding to rolling zero velocity throws", () => {
   const cue = new BallState([0.5, 0.7], [0, 0], [0, 0], MotionState.SLIDING);
   expect(() => timeSlidingToRolling(cue, G)).toThrow();
+});
+
+test("time sliding to rolling with vel already at the natural-roll condition returns 0, does not throw", () => {
+  // Regression: a moving ball (vel != 0) can have vel/omega that already satisfy the
+  // natural-roll condition exactly — e.g. a cue strike whose follow spin happens to match
+  // natural roll for that speed (spin = 1 / (MAX_CUE_SPIN * radius) = 0.8 here). That's a
+  // real, valid state with zero time left to reach rolling, not an error — only a ball with
+  // neither vel nor omega is actually stationary.
+  const cue = cueStrike([0.5, 0.7], [1, 0], 2.0, 0.8);
+  const slip = norm(add(cue.vel, scale(rotate90(cue.omega), cue.radius)));
+  expect(slip).toBeLessThan(1e-9);
+  expect(timeSlidingToRolling(cue, G)).toBe(0);
 });
 
 test("time sliding to rolling pure spin zero velocity does not throw", () => {

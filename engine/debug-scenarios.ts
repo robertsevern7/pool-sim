@@ -1,7 +1,7 @@
 import { BallState, MotionState } from "./physics/ball-state";
-import { BALL_RADIUS, STANDARD_9_FOOT, MU_ROLL, G } from "./physics/constants";
+import { BALL_RADIUS, STANDARD_9_FOOT, MU_ROLL, G, MAX_SQUIRT_ANGLE } from "./physics/constants";
 import { cueStrike } from "./physics/motion-models";
-import { rotate90, scale, Vec2 } from "./physics/vec2";
+import { normalize, rotate90, rotateByAngle, scale, Vec2 } from "./physics/vec2";
 import { scenario, obj, type Scenario } from "./scenarios";
 
 const TABLE = STANDARD_9_FOOT;
@@ -161,11 +161,36 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     // ball off the pure geometric tangent line. Same thin cut, same speed, as a spinless
     // shot would use — only the english differs. See resolveBallCollision in
     // engine/physics/event-resolution.ts.
+    //
+    // Sidespin also squirts the cue ball off its aim line (see "squirt_miss" below), which
+    // would otherwise confound this demo by changing where the cut even lands — so the aim
+    // direction here is pre-compensated for the squirt this exact sidespin will produce,
+    // isolating throw the same way a player aiming to compensate for squirt would.
     const cueX = 0.4;
     const objX = 1.2;
+    const objY = CY + 0.01;
+    const sidespin = 1.0;
+    const desiredDir = normalize([objX - cueX, objY - CY]);
+    const squirtAngle = -sidespin * MAX_SQUIRT_ANGLE;
+    const aimDir = rotateByAngle(desiredDir, -squirtAngle);
+    return [
+      cueStrike([cueX, CY], aimDir, 2.5, 0, sidespin),
+      obj([objX, objY], 1),
+    ];
+  }),
+  scenario("squirt_miss", () => {
+    // Squirt: sidespin's tip offset gives the cue impulse a small reaction component not
+    // aligned with the aim direction, deflecting the ball's actual initial path away from
+    // where the cue was aimed — the tip has some "give" relative to the ball (see
+    // MAX_SQUIRT_ANGLE in engine/physics/constants.ts). A dead-straight aim at an object
+    // ball, with max sidespin and no compensation, squirts enough over this distance to
+    // miss it completely — the same shot with no sidespin hits it dead center.
+    // See cueStrike in engine/physics/motion-models.ts.
+    const cueX = 0.4;
+    const objX = 1.8;
     return [
       cueStrike([cueX, CY], [1, 0], 2.5, 0, 1.0),
-      obj([objX, CY + 0.01], 1),
+      obj([objX, CY], 1),
     ];
   }),
   scenario("two_ball", () => [

@@ -27,6 +27,17 @@ export const BALL_MASS = 0.17;
 //   omega = 5*v*h / (2*R²), h_max = R/2  →  omega_max = 5*v / (4*R)
 export const MAX_CUE_SPIN = 5.0 / (4.0 * BALL_RADIUS); // ≈ 43.7 rad/s per m/s
 
+// Squirt (cue ball deflection) angle at max sidespin/tip offset (just under the miscue
+// limit). Squirt exists because the tip has some "give" relative to the ball — a rigid,
+// infinite-mass cue would produce zero deflection regardless of offset — but the exact
+// value depends on shaft stiffness and tip contact mechanics this engine doesn't model, so
+// this is taken directly from published measurements rather than derived here. Per Ron
+// Shepard's squirt paper and Dr. Dave Alciatore's pool physics FAQ, measured squirt angles
+// at max offset range roughly 0.5°–2.5° across real cues, from low-deflection shafts at the
+// low end to standard/high-deflection wood shafts at the high end. 2.5° models a standard
+// shaft, since this engine doesn't offer an equipment/shaft choice.
+export const MAX_SQUIRT_ANGLE = (2.5 * Math.PI) / 180; // ≈ 0.0436 rad
+
 export const STANDARD_9_FOOT: Table = {
   width: 2.84,
   height: 1.42,

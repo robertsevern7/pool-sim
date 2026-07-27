@@ -98,6 +98,15 @@ test("simulate single ball slides rolls stops", () => {
   expect(ball.pos[0]).toBeLessThan(STANDARD_9_FOOT.width - BALL_RADIUS);
 });
 
+test("simulate a shot already at the natural-roll condition (spin = 0.8) does not crash", () => {
+  // Regression: spin = 0.8 makes vel/omega satisfy the natural-roll condition exactly right
+  // out of cueStrike, so timeSlidingToRolling used to throw here instead of returning 0.
+  const ball = cueStrike([0.5, 0.71], [1, 0], 2.0, 0.8);
+  const state = new SimulationState([ball], 0.0);
+  expect(() => simulate(state, STANDARD_9_FOOT)).not.toThrow();
+  expect(ball.motion).toBe(MotionState.STOPPED);
+});
+
 test("simulate ball with pure spin and zero velocity starts moving and stops", () => {
   // Regression for the fix to ballAcceleration/slidingMotion: a ball with vel = 0 but
   // omega != 0 used to be treated as fully at rest. It should now translate away from

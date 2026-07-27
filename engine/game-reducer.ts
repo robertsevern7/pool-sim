@@ -1,5 +1,5 @@
 import { BallState, MotionState } from "./physics/ball-state";
-import { STANDARD_9_FOOT, MAX_CUE_SPIN } from "./physics/constants";
+import { STANDARD_9_FOOT, MAX_CUE_SPIN, MAX_SQUIRT_ANGLE } from "./physics/constants";
 import {
   recordSimulation,
   recordTrajectories,
@@ -7,7 +7,7 @@ import {
   Trajectory,
 } from "./physics/recorder";
 import { cueStrike } from "./physics/motion-models";
-import { Vec2, dot, norm, normalize, rotate90, sub } from "./physics/vec2";
+import { Vec2, dot, norm, normalize, rotate90, rotateByAngle, sub } from "./physics/vec2";
 import { analyzeShot, INITIAL_RULES, type GameRules } from "./rules";
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -85,14 +85,19 @@ export type Action =
 export function extractCueParams(cueBall: BallState): { speed: number; spin: number; sidespin: number } {
   const speed = norm(cueBall.vel);
   if (speed === 0) return { speed, spin: 0, sidespin: 0 };
-  // Invert cueStrike's omega = rotate90(dir) * spin * MAX_CUE_SPIN * speed by projecting
-  // omega back onto rotate90(dir). spinZ = sidespin * MAX_CUE_SPIN * speed inverts directly.
-  const dir = normalize(cueBall.vel);
+  // spinZ = sidespin * MAX_CUE_SPIN * speed inverts directly — squirt doesn't touch spinZ.
+  const sidespin = cueBall.spinZ / (MAX_CUE_SPIN * speed);
+  // cueStrike's omega = rotate90(dir) * spin * MAX_CUE_SPIN * speed is set from the original
+  // aim direction, but vel is squirt-deflected away from it by -sidespin * MAX_SQUIRT_ANGLE.
+  // Undo that rotation before projecting omega back onto rotate90(dir), or `spin` would pick
+  // up an error proportional to the squirt angle.
+  const squirtAngle = -sidespin * MAX_SQUIRT_ANGLE;
+  const dir = rotateByAngle(normalize(cueBall.vel), -squirtAngle);
   const spinComponent = dot(cueBall.omega, rotate90(dir));
   return {
     speed,
     spin: spinComponent / (MAX_CUE_SPIN * speed),
-    sidespin: cueBall.spinZ / (MAX_CUE_SPIN * speed),
+    sidespin,
   };
 }
 

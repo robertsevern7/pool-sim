@@ -264,7 +264,7 @@ export function computeNextEvent(
   for (let i = 0; i < state.balls.length; i++) {
     for (let j = i + 1; j < state.balls.length; j++) {
       const t = predictBallBallCollision(state.balls[i], state.balls[j], G);
-      if (t && (earliest === null || state.time + t < earliest.time)) {
+      if (t !== null && (earliest === null || state.time + t < earliest.time)) {
         earliest = {
           time: state.time + t,
           eventType: "BALL_COLLISION",
@@ -278,7 +278,7 @@ export function computeNextEvent(
   // rail collisions
   for (let i = 0; i < state.balls.length; i++) {
     const t = predictRailCollision(state.balls[i], table);
-    if (t && (earliest === null || state.time + t < earliest.time)) {
+    if (t !== null && (earliest === null || state.time + t < earliest.time)) {
       earliest = {
         time: state.time + t,
         eventType: "RAIL_COLLISION",
@@ -291,7 +291,7 @@ export function computeNextEvent(
   // pocket entries
   for (let i = 0; i < state.balls.length; i++) {
     const result = predictPocketEntry(state.balls[i], table);
-    if (result && (earliest === null || state.time + result.time < earliest.time)) {
+    if (result !== null && (earliest === null || state.time + result.time < earliest.time)) {
       earliest = {
         time: state.time + result.time,
         eventType: "POCKET",
@@ -304,7 +304,7 @@ export function computeNextEvent(
   // state transitions
   for (let i = 0; i < state.balls.length; i++) {
     const t = predictStateTransition(state.balls[i]);
-    if (t && (earliest === null || state.time + t < earliest.time)) {
+    if (t !== null && (earliest === null || state.time + t < earliest.time)) {
       earliest = {
         time: state.time + t,
         eventType: "STATE_CHANGE",

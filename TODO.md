@@ -41,9 +41,39 @@ they'd change existing behavior — the deferred items from that fix's planning 
       `game-reducer.test.ts`; playable via the "Throw Off Line" debug scenario (same thin cut
       and speed as a spinless shot, but heavy english visibly sends the object ball to a
       different spot on the far rail).
-- [ ] **No squirt/deflection from cue tip offset.** Off-center hits for english should deflect
-      the cue ball's initial direction slightly from where the cue was aimed; `cueStrike` takes
-      direction and spin as independent, already-resolved inputs.
+- [x] **No squirt/deflection from cue tip offset.** `cueStrike` now deflects the ball's actual
+      initial direction away from the aimed `direction` by an angle proportional to `sidespin`
+      (`MAX_SQUIRT_ANGLE` in `constants.ts`). Calibrated to 2.5° at max offset from published
+      measurements (Ron Shepard's squirt paper / Dr. Dave Alciatore's pool physics FAQ: ~0.5°
+      for low-deflection shafts up to ~2.5° for standard wood shafts) rather than derived from
+      a cue-mass model — this engine doesn't simulate shaft stiffness/tip contact mechanics,
+      and an invented "effective mass ratio" produced an unrealistic ~5.7°, way outside the
+      measured range, before being corrected. `omega`/`spinZ` are still set from the original
+      aim direction (the tip contact geometry), only `vel` uses the deflected direction — so
+      omega ends up not quite perpendicular to vel, meaning a heavy-english shot now also
+      curves slightly during its initial slide, for the same reason the post-collision curving
+      fix works. Fixed `extractCueParams` in `game-reducer.ts` to undo the squirt rotation
+      before projecting omega back out, or recovered `spin` would carry an error whenever
+      `sidespin != 0`. Covered by new tests in `motion-models.test.ts` and
+      `game-reducer.test.ts`; playable via the new "Squirt Miss" debug scenario (a
+      dead-straight aim at an object ball misses entirely with uncompensated max sidespin, but
+      hits it dead center with none). Also had to re-tune "Throw Off Line" — squirt was
+      confounding it — its aim is now pre-compensated for its own sidespin's squirt so it
+      isolates ball-ball throw the way a player compensating for squirt would.
+
+      Also fixed, found via manual testing: `computeNextEvent` in `event-prediction.ts` used
+      `if (t && ...)` to gate each predicted event time, which silently drops a legitimate
+      `t = 0` (0 is falsy in JS). This became a live, hittable crash once `timeSlidingToRolling`
+      could validly return exactly 0 (e.g. `spin = 0.8` puts a ball exactly at the natural-roll
+      condition right out of `cueStrike`) — a follow-on regression from the "pure spin" fix
+      above, which changed that function's guard from `vel = 0` to `slip = 0` but didn't
+      account for a *moving* ball already at zero slip. The event was silently dropped, leaving
+      the ball stuck mid-preview, and a later action (changing the aim) crashed deep inside
+      code that assumed that couldn't happen. Fixed the guard to only throw when truly at rest
+      (`vel = 0` and `omega = 0`), and fixed all four `computeNextEvent` checks to use
+      `t !== null`. Covered by regression tests in `motion-models.test.ts`,
+      `event-prediction.test.ts`, `simulator.test.ts`, and `game-reducer.test.ts` (the exact
+      set-spin-then-change-aim repro).
 - [ ] **Rail contact has no spin transfer or spin-dependent throw.** `resolveRailCollision` in
       `engine/physics/event-resolution.ts` is a pure reflection + restitution coefficient on
       `vel`; `omega` is untouched. (Side note: because of that, a spinning ball should already

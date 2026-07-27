@@ -62,6 +62,7 @@ export const strings = {
     curve_into_pocket: { name: "Curve Into Pocket", description: "Follow-cut curves the cue ball into a corner it would otherwise slide past" },
     draw_creep: { name: "Draw Creep", description: "Cue ball stops dead on a full hit but draws back afterward from leftover backspin" },
     throw_off_line: { name: "Throw Off Line", description: "Cue-ball sidespin (english) throws the cut ball off the true tangent line" },
+    squirt_miss: { name: "Squirt Miss", description: "Uncompensated sidespin squirts the cue ball off a dead-straight aim, missing the object ball entirely" },
     two_ball: { name: "Two Ball", description: "Cue ball and object ball — aim freely" },
     endgame: { name: "Endgame", description: "8-ball, one solid, one stripe — finish the frame" },
     mid_game_spread: { name: "Tor Lowry Example", description: "Mid-game position — balls spread across the table" },

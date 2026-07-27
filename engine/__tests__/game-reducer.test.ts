@@ -244,6 +244,16 @@ describe("sidespin (english) round-trips through the reducer", () => {
     expect(sidespin).toBeCloseTo(0.6, 6);
   });
 
+  test("extractCueParams recovers both spin and sidespin when squirt has deflected vel", () => {
+    // Regression: cueStrike now deflects vel away from the aim direction (squirt) whenever
+    // sidespin != 0, so extractCueParams must undo that rotation before projecting omega
+    // back out, or `spin` would come back wrong for any shot that also has sidespin.
+    const cue = cueStrike([CUE_X, CY], [1, 0], 3.0, 0.4, 0.6);
+    const { spin, sidespin } = extractCueParams(cue);
+    expect(spin).toBeCloseTo(0.4, 6);
+    expect(sidespin).toBeCloseTo(0.6, 6);
+  });
+
   test("LOAD_SCENARIO extracts cueSidespin from the scenario's cue ball", () => {
     const balls = [
       cueStrike([CUE_X, CY], [1, 0], 3.0, 0, 0.6),
@@ -299,5 +309,19 @@ describe("sidespin (english) round-trips through the reducer", () => {
     expect(next.cueSpin * next.cueSpin + next.cueSidespin * next.cueSidespin).toBeLessThanOrEqual(1 + 1e-9);
     // Direction (ratio between the two) should be preserved by the clamp.
     expect(next.cueSpin).toBeCloseTo(next.cueSidespin, 6);
+  });
+
+  // Regression: spin = 0.8 (no sidespin) puts the cue ball exactly at the natural-roll
+  // condition right out of cueStrike (timeSlidingToRolling returns 0, not an error — see
+  // motion-models.ts). computeNextEvent used to drop that zero-time transition entirely
+  // (`if (t && ...)` treats t=0 as falsy), so the ball got stuck mid-preview and any further
+  // aim recompute — e.g. changing the aim direction — threw deep inside cueStrike/predictor
+  // code that assumed a "stuck" ball couldn't happen.
+  test("setting spin to the natural-roll value then changing aim does not crash", () => {
+    let s = loadScenario(makeTwoBallScenario());
+    s = reducer(s, { type: "SET_TIP_OFFSET", spin: 0.8, sidespin: 0 });
+    expect(() =>
+      reducer(s, { type: "AIM_AT_POINT", point: [OBJ_X, CY + 0.05] }),
+    ).not.toThrow();
   });
 });

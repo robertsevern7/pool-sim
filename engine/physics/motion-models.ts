@@ -1,6 +1,6 @@
 import { BallState, MotionState } from "./ball-state";
-import { MAX_CUE_SPIN } from "./constants";
-import { Vec2, add, norm, normalize, roundVec, rotate90, scale } from "./vec2";
+import { MAX_CUE_SPIN, MAX_SQUIRT_ANGLE } from "./constants";
+import { Vec2, add, norm, normalize, roundVec, rotate90, rotateByAngle, scale } from "./vec2";
 
 const POSITION_DP = 6;
 
@@ -55,7 +55,19 @@ export function cueStrike(
   }
 
   const dir = normalize(direction);
-  const vel: Vec2 = scale(dir, speed);
+
+  // Squirt: the tip's impulse on an off-center (sidespin) hit isn't perfectly aligned with
+  // the cue's aim direction — the tip has some give relative to the ball — so the ball's
+  // actual initial path deflects by a small angle, to the opposite side from the sidespin.
+  // The spin axes are set by the tip contact geometry (the aim direction itself), not by
+  // the resulting deflected path — so omega/spinZ below still use `dir`, only vel uses the
+  // deflected direction. That mismatch (omega no longer quite perpendicular to vel) means
+  // the ball also curves slightly during its initial slide, same mechanism as the
+  // post-collision curving fix.
+  const squirtAngle = -sidespin * MAX_SQUIRT_ANGLE;
+  const squirtDir = rotateByAngle(dir, squirtAngle);
+
+  const vel: Vec2 = scale(squirtDir, speed);
   const omega = scale(rotate90(dir), spin * MAX_CUE_SPIN * speed);
   const spinZ = sidespin * MAX_CUE_SPIN * speed;
 
@@ -219,10 +231,17 @@ export function timeToTravelDistance(
 export function timeSlidingToRolling(ball: BallState, g: number): number {
   // Slip (not vel) is what drives this transition — a ball spinning in place (vel = 0)
   // has nonzero slip and a well-defined time to reach natural roll, same as any other
-  // sliding ball (see ballAcceleration).
+  // sliding ball (see ballAcceleration). But slip = 0 doesn't necessarily mean the ball is
+  // at rest: a genuinely moving ball can have vel/omega that already satisfy the
+  // natural-roll condition exactly (e.g. a cue strike whose follow spin happens to match
+  // natural roll for that speed) — that's a real, valid state, just with zero time left to
+  // reach it, not an error. Only a ball with no vel *and* no omega is actually stationary.
   const slip = norm(add(ball.vel, scale(rotate90(ball.omega), ball.radius)));
   if (slip === 0) {
-    throw new Error("ball is sliding with zero slip velocity");
+    if (norm(ball.vel) === 0 && norm(ball.omega) === 0) {
+      throw new Error("ball is stationary, not sliding");
+    }
+    return 0;
   }
   return (2 * slip) / (7 * ball.mu()! * g);
 }
