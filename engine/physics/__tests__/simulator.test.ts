@@ -98,6 +98,19 @@ test("simulate single ball slides rolls stops", () => {
   expect(ball.pos[0]).toBeLessThan(STANDARD_9_FOOT.width - BALL_RADIUS);
 });
 
+test("simulate ball with pure spin and zero velocity starts moving and stops", () => {
+  // Regression for the fix to ballAcceleration/slidingMotion: a ball with vel = 0 but
+  // omega != 0 used to be treated as fully at rest. It should now translate away from
+  // its starting spot purely from spin-driven friction, then settle like any other shot.
+  const startPos: [number, number] = [1.42, 0.71];
+  const ball = new BallState(startPos, [0, 0], [0, 50], MotionState.SLIDING);
+  const state = new SimulationState([ball], 0.0);
+  simulate(state, STANDARD_9_FOOT);
+  expect(ball.motion).toBe(MotionState.STOPPED);
+  expect(norm(ball.vel)).toBeCloseTo(0, 6);
+  expect(norm(sub(ball.pos, startPos))).toBeGreaterThan(0.01);
+});
+
 test("simulate ball hits rail and stops", () => {
   const ball = new BallState([2.5, 0.71], [3.0, 0.0], [0, 0], MotionState.ROLLING);
   const state = new SimulationState([ball], 0.0);

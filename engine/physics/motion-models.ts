@@ -7,10 +7,9 @@ const POSITION_DP = 6;
 export function ballAcceleration(ball: BallState, g: number): Vec2 {
   if (ball.motion === MotionState.STOPPED) return [0, 0];
 
-  const speed = norm(ball.vel);
-  if (speed === 0) return [0, 0];
-
   if (ball.motion === MotionState.ROLLING) {
+    const speed = norm(ball.vel);
+    if (speed === 0) return [0, 0];
     const direction = scale(ball.vel, 1 / speed);
     return scale(direction, -ball.mu()! * g);
   }
@@ -18,7 +17,11 @@ export function ballAcceleration(ball: BallState, g: number): Vec2 {
   // Sliding: friction opposes the contact-point slip velocity. This is generally
   // NOT colinear with vel — e.g. right after a collision, vel jumps to the tangent
   // direction but omega (spin axis) is unchanged, so the ball curves as it slides.
-  const slipDir = normalize(add(ball.vel, scale(rotate90(ball.omega), ball.radius)));
+  // Notably this slip can be nonzero even when vel = 0: a ball spinning in place still
+  // has a moving contact point, so friction accelerates it from rest.
+  const slip = add(ball.vel, scale(rotate90(ball.omega), ball.radius));
+  if (norm(slip) === 0) return [0, 0];
+  const slipDir = normalize(slip);
   return scale(slipDir, -ball.mu()! * g);
 }
 
@@ -53,13 +56,14 @@ export function slidingMotion(
   g: number,
 ): { pos: Vec2; vel: Vec2; omega: Vec2 } {
   const v0 = ball.vel;
-  const speed = norm(v0);
+  const u0 = add(v0, scale(rotate90(ball.omega), ball.radius));
 
-  if (speed === 0) {
+  // Zero slip means zero friction, so nothing changes — but that's not the same as v0 = 0:
+  // a ball spinning in place (v0 = 0, omega != 0) still slips and starts to translate.
+  if (norm(u0) === 0) {
     return { pos: ball.pos, vel: ball.vel, omega: ball.omega };
   }
 
-  const u0 = add(v0, scale(rotate90(ball.omega), ball.radius));
   const uHat = normalize(u0);
 
   const a = scale(uHat, -ball.mu()! * g);
@@ -201,11 +205,13 @@ export function timeToTravelDistance(
 }
 
 export function timeSlidingToRolling(ball: BallState, g: number): number {
-  const v0 = norm(ball.vel);
-  if (v0 === 0) {
-    throw new Error("ball is sliding with zero velocity");
-  }
+  // Slip (not vel) is what drives this transition — a ball spinning in place (vel = 0)
+  // has nonzero slip and a well-defined time to reach natural roll, same as any other
+  // sliding ball (see ballAcceleration).
   const slip = norm(add(ball.vel, scale(rotate90(ball.omega), ball.radius)));
+  if (slip === 0) {
+    throw new Error("ball is sliding with zero slip velocity");
+  }
   return (2 * slip) / (7 * ball.mu()! * g);
 }
 

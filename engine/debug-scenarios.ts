@@ -140,6 +140,21 @@ export const DEBUG_SCENARIOS: Scenario[] = [
       obj([2.7, 0.15], 1),
     ];
   }),
+  scenario("draw_creep", () => {
+    // A full/head-on hit transfers the cue ball's entire velocity to the object ball
+    // (there's no tangential component to leave behind), so the cue ball's vel drops to
+    // ~0 right at contact — but the collision doesn't touch omega, so its backspin
+    // survives untouched. That's pure spin with zero velocity, still SLIDING. It should
+    // draw back afterward under spin-driven friction rather than stay frozen at the
+    // point of contact. See ballAcceleration/slidingMotion in engine/physics/motion-models.ts.
+    const gap = 0.4;
+    const cueX = TABLE.width / 2 - gap / 2;
+    const objX = cueX + gap;
+    return [
+      cueStrike([cueX, CY], [1, 0], 2.0, -0.8),
+      obj([objX, CY], 1),
+    ];
+  }),
   scenario("two_ball", () => [
     cueStrike([CUE_X, CY], [1, 0], 2.5),
     obj([OBJ_X, CY], 1),

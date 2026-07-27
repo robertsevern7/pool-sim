@@ -13,10 +13,15 @@ they'd change existing behavior — the deferred items from that fix's planning 
       fixed for the sub-phase, so this is not an approximation). Covered by new tests in
       `engine/physics/__tests__/event-prediction.test.ts` and playable via the "Curve Into
       Pocket" debug scenario.
-- [ ] **A ball with pure spin and zero velocity stays frozen.** `ballAcceleration` and
-      `slidingMotion` in `engine/physics/motion-models.ts` return no motion at all when
-      `vel = 0`, regardless of `omega`. In reality a ball spinning in place would start to
-      translate from cloth friction.
+- [x] **A ball with pure spin and zero velocity stays frozen.** `ballAcceleration` and
+      `slidingMotion` in `engine/physics/motion-models.ts` now key off the contact-point slip
+      (`vel + rotate90(omega) * radius`) instead of `vel` alone, so a ball with `vel = 0` and
+      `omega != 0` correctly accelerates from rest. `timeSlidingToRolling`'s zero-velocity guard
+      and `predictPocketEntry`'s zero-speed early exit had the same bug and are fixed too —
+      both are on the hot path for any SLIDING ball, spinning-in-place or not. Covered by new
+      tests in `motion-models.test.ts` and `simulator.test.ts`, and playable via the "Draw
+      Creep" debug scenario (a full/head-on draw shot: the cue ball stops dead on contact but
+      now draws back afterward from leftover backspin, instead of staying frozen).
 
 ## Bigger gaps (not touched by that fix)
 

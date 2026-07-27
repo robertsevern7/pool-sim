@@ -8,7 +8,7 @@ import {
   timeRollingToStop,
   timeSlidingToRolling,
 } from "./motion-models";
-import { sub, scale, dot, norm, Vec2 } from "./vec2";
+import { sub, scale, dot, Vec2 } from "./vec2";
 import { solvePolynomial } from "./polynomial";
 
 export interface Event {
@@ -202,9 +202,10 @@ function predictPocketEntry(
 ): { time: number; pocketIndex: number } | null {
   if (ball.motion === MotionState.STOPPED) return null;
 
-  const speed = norm(ball.vel);
-  if (speed < 1e-9) return null;
-
+  // No early exit on vel = 0: a spinning ball can accelerate from rest (see
+  // ballAcceleration), so its trajectory can still cross a pocket's fall circle. The
+  // quartic below handles that case directly — it degenerates to "no roots" on its own
+  // when the ball is truly motionless (vel = 0 and no spin-driven acceleration).
   const a = ballAcceleration(ball, G);
   const halfA: Vec2 = scale(a, 0.5);
   const tMax = predictStateTransition(ball) ?? Infinity;

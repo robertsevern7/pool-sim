@@ -10,7 +10,7 @@ import {
   timeToReachPoint,
   timeToTravelDistance,
 } from "../motion-models";
-import { norm } from "../vec2";
+import { add, norm, rotate90, scale } from "../vec2";
 
 function q3(n: number): string {
   return n.toFixed(3);
@@ -109,6 +109,20 @@ test("time sliding to rolling zero velocity throws", () => {
   expect(() => timeSlidingToRolling(cue, G)).toThrow();
 });
 
+test("time sliding to rolling pure spin zero velocity does not throw", () => {
+  // vel = 0 alone isn't "no slip" — a spinning ball still slips at the contact point
+  // and has a well-defined time to reach natural roll, same as any sliding ball.
+  const ball = new BallState([0.5, 0.7], [0, 0], [0, 50], MotionState.SLIDING);
+  const t = timeSlidingToRolling(ball, G);
+  expect(t).toBeGreaterThan(0);
+
+  const { vel, omega } = slidingMotion(ball, t, G);
+  const slip = norm(add(vel, scale(rotate90(omega), ball.radius)));
+  expect(slip).toBeLessThan(1e-6);
+  // The ball didn't stay frozen — it picked up real forward speed purely from spin.
+  expect(norm(vel)).toBeGreaterThan(0.1);
+});
+
 test("time sliding to rolling very slow", () => {
   const cue = cueStrike([0.5, 0.7], [1, 0], 0.001);
   const t = timeSlidingToRolling(cue, G);
@@ -164,6 +178,19 @@ test("sliding motion zero velocity returns unchanged", () => {
   expect(pos[1]).toBe(2.0);
   expect(vel[0]).toBe(0.0);
   expect(vel[1]).toBe(0.0);
+});
+
+test("sliding motion pure spin zero velocity starts moving", () => {
+  // Zero vel with nonzero omega is not the same as fully stopped — the spinning contact
+  // point still slips against the cloth, so friction should accelerate the ball from rest.
+  const ball = new BallState([0, 0], [0.0, 0.0], [0, 50], MotionState.SLIDING);
+  const { pos, vel, omega } = slidingMotion(ball, 0.1, G);
+  expect(q3(pos[0])).toBe("0.010");
+  expect(q3(pos[1])).toBe("0.000");
+  expect(q3(vel[0])).toBe("0.196");
+  expect(q3(vel[1])).toBe("0.000");
+  // Spin decays as translation picks up, from the same friction torque.
+  expect(q3(omega[1])).toBe("32.835");
 });
 
 test("sliding motion t zero", () => {
@@ -382,6 +409,15 @@ test("ball acceleration zero velocity sliding", () => {
   const a = ballAcceleration(ball, G);
   expect(a[0]).toBe(0.0);
   expect(a[1]).toBe(0.0);
+});
+
+test("ball acceleration pure spin zero velocity is nonzero", () => {
+  // A ball with vel = 0 but omega != 0 still has a slipping contact point, so friction
+  // should accelerate it from rest rather than leaving it frozen.
+  const ball = new BallState([0, 0], [0.0, 0.0], [0, 50.0], MotionState.SLIDING);
+  const a = ballAcceleration(ball, G);
+  expect(q3(a[0])).toBe("1.962");
+  expect(q3(a[1])).toBe("0.000");
 });
 
 // ── time_to_reach_point ──
