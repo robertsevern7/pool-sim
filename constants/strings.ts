@@ -61,6 +61,7 @@ export const strings = {
     pot_side_right: { name: "Pot Side Right", description: "Straight shot into right side pocket" },
     two_ball: { name: "Two Ball", description: "Cue ball and object ball — aim freely" },
     endgame: { name: "Endgame", description: "8-ball, one solid, one stripe — finish the frame" },
+    mid_game_spread: { name: "Tor Lowry Example", description: "Mid-game position — balls spread across the table" },
   },
 } as const;
 

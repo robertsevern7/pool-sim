@@ -105,4 +105,31 @@ export const SCENARIOS: Scenario[] = [
       obj([mid + R * 4, CY + R * 4], 11),   // stripe (11)
     ];
   }, { placeCue: true }),
+
+  scenario("mid_game_spread", () => [
+    // Top of table
+    obj([0.062, 1.358], 5),        // orange — row 0.7, col 15.3
+    obj([0.31, 0.89], 11),         // red stripe — upper area
+
+    // Upper cluster
+    obj([0.49, 0.89], 9),          // yellow stripe
+    obj([0.53, 0.93], 12),         // purple stripe
+    obj([0.58, 1.02], 6),          // green — rightmost of cluster
+
+    // Middle cluster
+    obj([0.71, 0.89], 2),          // blue
+    obj([0.75, 0.93], 1),          // yellow
+    obj([0.80, 0.89], 7),          // maroon
+    obj([0.84, 0.93], 10),         // blue stripe
+
+    // Lower-middle cluster
+    obj([0.93, 0.89], 13),         // orange stripe
+    obj([0.98, 0.84], 3),          // red
+    obj([1.02, 0.93], 4),          // purple
+
+    // Bottom of table
+    obj([2.13, 0.80], 8),          // black
+    obj([2.22, 0.75], 15),         // maroon stripe
+    obj([2.22, 0.98], 14),         // green stripe
+  ], { placeCue: true }),
 ];
