@@ -10,7 +10,7 @@ const CY = TABLE.height / 2;
 // ── recordTrajectories: structure ──
 
 test("single stopped ball produces no trajectory (length < 2)", () => {
-  const ball = new BallState([1.0, CY], [0, 0], 0, MotionState.STOPPED);
+  const ball = new BallState([1.0, CY], [0, 0], [0, 0], MotionState.STOPPED);
   const trajs = recordTrajectories([ball], TABLE);
   expect(trajs).toHaveLength(1);
   // start and final resting are the same spot — only 1 point
@@ -18,7 +18,7 @@ test("single stopped ball produces no trajectory (length < 2)", () => {
 });
 
 test("single rolling ball has start and final resting ghost", () => {
-  const ball = new BallState([0.5, CY], [1.0, 0], 1.0 / R, MotionState.ROLLING);
+  const ball = new BallState([0.5, CY], [1.0, 0], [0, 1.0 / R], MotionState.ROLLING);
   const trajs = recordTrajectories([ball], TABLE);
   expect(trajs).toHaveLength(1);
   const traj = trajs[0];
@@ -36,7 +36,7 @@ test("single rolling ball has start and final resting ghost", () => {
 
 test("ball hitting rail has ghost at rail contact", () => {
   // Fast ball aimed at the far rail
-  const ball = new BallState([1.0, CY], [3.0, 0], 3.0 / R, MotionState.ROLLING);
+  const ball = new BallState([1.0, CY], [3.0, 0], [0, 3.0 / R], MotionState.ROLLING);
   const trajs = recordTrajectories([ball], TABLE);
   const traj = trajs[0];
 
@@ -58,7 +58,7 @@ test("ball hitting rail has ghost at rail contact", () => {
 
 test("two-ball collision produces ghosts on both balls", () => {
   const cue = cueStrike([0.5, CY], [1, 0], 2.0);
-  const obj = new BallState([1.2, CY], [0, 0], 0, MotionState.STOPPED);
+  const obj = new BallState([1.2, CY], [0, 0], [0, 0], MotionState.STOPPED);
   const trajs = recordTrajectories([cue, obj], TABLE);
 
   expect(trajs).toHaveLength(2);
@@ -82,7 +82,7 @@ test("two-ball collision produces ghosts on both balls", () => {
 
 test("object ball trajectory starts at its initial position", () => {
   const cue = cueStrike([0.5, CY], [1, 0], 2.0);
-  const obj = new BallState([1.2, CY], [0, 0], 0, MotionState.STOPPED);
+  const obj = new BallState([1.2, CY], [0, 0], [0, 0], MotionState.STOPPED);
   const trajs = recordTrajectories([cue, obj], TABLE);
 
   expect(trajs[1][0].pos[0]).toBeCloseTo(1.2, 4);
@@ -94,7 +94,7 @@ test("object ball trajectory starts at its initial position", () => {
 
 test("final resting position is always a ghost", () => {
   const cue = cueStrike([0.5, CY], [1, 0], 2.0);
-  const obj = new BallState([1.2, CY], [0, 0], 0, MotionState.STOPPED);
+  const obj = new BallState([1.2, CY], [0, 0], [0, 0], MotionState.STOPPED);
   const trajs = recordTrajectories([cue, obj], TABLE);
 
   for (const traj of trajs) {
@@ -105,7 +105,7 @@ test("final resting position is always a ghost", () => {
 
 test("no duplicate final point when last event is at resting position", () => {
   // A ball aimed at a rail that loses most energy on bounce
-  const ball = new BallState([2.5, CY], [0.5, 0], 0.5 / R, MotionState.ROLLING);
+  const ball = new BallState([2.5, CY], [0.5, 0], [0, 0.5 / R], MotionState.ROLLING);
   const trajs = recordTrajectories([ball], TABLE);
   const traj = trajs[0];
 
@@ -121,7 +121,7 @@ test("no duplicate final point when last event is at resting position", () => {
 
 test("does not mutate initial ball states", () => {
   const cue = cueStrike([0.5, CY], [1, 0], 2.0);
-  const obj = new BallState([1.2, CY], [0, 0], 0, MotionState.STOPPED);
+  const obj = new BallState([1.2, CY], [0, 0], [0, 0], MotionState.STOPPED);
   const origCuePos: [number, number] = [cue.pos[0], cue.pos[1]];
   const origObjPos: [number, number] = [obj.pos[0], obj.pos[1]];
 
@@ -136,7 +136,7 @@ test("does not mutate initial ball states", () => {
 // ── recordTrajectories: waypoints are only at collisions ──
 
 test("intermediate non-ghost points do not exist (only start is non-ghost)", () => {
-  const ball = new BallState([1.0, CY], [3.0, 0], 3.0 / R, MotionState.ROLLING);
+  const ball = new BallState([1.0, CY], [3.0, 0], [0, 3.0 / R], MotionState.ROLLING);
   const trajs = recordTrajectories([ball], TABLE);
   const traj = trajs[0];
 
@@ -149,7 +149,7 @@ test("intermediate non-ghost points do not exist (only start is non-ghost)", () 
 // ── recordSimulation: basic sanity ──
 
 test("recordSimulation returns frames at roughly 60fps", () => {
-  const ball = new BallState([0.5, CY], [1.0, 0], 1.0 / R, MotionState.ROLLING);
+  const ball = new BallState([0.5, CY], [1.0, 0], [0, 1.0 / R], MotionState.ROLLING);
   const { frames } = recordSimulation([ball], TABLE, 60);
 
   expect(frames.length).toBeGreaterThan(1);
@@ -162,7 +162,7 @@ test("recordSimulation returns frames at roughly 60fps", () => {
 });
 
 test("recordSimulation first and last frames bracket the motion", () => {
-  const ball = new BallState([0.5, CY], [1.0, 0], 1.0 / R, MotionState.ROLLING);
+  const ball = new BallState([0.5, CY], [1.0, 0], [0, 1.0 / R], MotionState.ROLLING);
   const { frames } = recordSimulation([ball], TABLE, 60);
 
   expect(frames[0].time).toBe(0);

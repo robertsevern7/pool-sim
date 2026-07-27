@@ -1,6 +1,7 @@
 import { BallState, MotionState } from "./physics/ball-state";
 import { BALL_RADIUS, STANDARD_9_FOOT, MU_ROLL, G } from "./physics/constants";
 import { cueStrike } from "./physics/motion-models";
+import { rotate90, scale, Vec2 } from "./physics/vec2";
 import { scenario, obj, type Scenario } from "./scenarios";
 
 const TABLE = STANDARD_9_FOOT;
@@ -39,16 +40,18 @@ export const DEBUG_SCENARIOS: Scenario[] = [
   scenario("lag_shot", () => {
     const baulkX = TABLE.width / 4;
     const speed = 1.832;
+    const vel: Vec2 = [speed, 0];
     return [
-      new BallState([baulkX, CY], [speed, 0], speed / R, MotionState.ROLLING),
+      new BallState([baulkX, CY], vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING),
     ];
   }),
   scenario("baulk_to_rail", () => {
     const baulkX = TABLE.width / 4;
     const farRailDist = TABLE.width - R - baulkX;
     const speed = Math.sqrt(2 * MU_ROLL * G * farRailDist);
+    const vel: Vec2 = [speed, 0];
     return [
-      new BallState([baulkX, CY], [speed, 0], speed / R, MotionState.ROLLING),
+      new BallState([baulkX, CY], vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING),
     ];
   }),
   scenario("pot_corner_tr", () => {

@@ -8,7 +8,7 @@ const R = BALL_RADIUS;
 const CY = TABLE.height / 2;
 
 export function obj(pos: [number, number], ballNumber: number): BallState {
-  return new BallState(pos, [0, 0], 0, MotionState.STOPPED, ballNumber);
+  return new BallState(pos, [0, 0], [0, 0], MotionState.STOPPED, ballNumber);
 }
 
 export interface Scenario {

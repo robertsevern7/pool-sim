@@ -30,10 +30,10 @@ function resolveBallCollision(a: BallState, b: BallState): void {
 
   for (const [ball, spinDir] of pairs) {
     const speed = norm(ball.vel);
-    if (speed < 1e-9 && Math.abs(ball.omega) < 1e-9) {
+    if (speed < 1e-9 && norm(ball.omega) < 1e-9) {
       ball.vel = [0, 0];
       ball.motion = MotionState.STOPPED;
-    } else if (speed < 1e-9 && Math.abs(ball.omega) > 1e-9) {
+    } else if (speed < 1e-9 && norm(ball.omega) > 1e-9) {
       ball.vel = scale(spinDir, 1e-6);
       ball.motion = MotionState.SLIDING;
     } else {

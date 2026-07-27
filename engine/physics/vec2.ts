@@ -32,3 +32,11 @@ export function roundVec(v: Vec2, dp: number): Vec2 {
   const f = 10 ** dp;
   return [Math.round(v[0] * f) / f, Math.round(v[1] * f) / f];
 }
+
+export function rotate90(v: Vec2): Vec2 {
+  return [-v[1], v[0]];
+}
+
+export function cross(a: Vec2, b: Vec2): number {
+  return a[0] * b[1] - a[1] * b[0];
+}

@@ -13,7 +13,7 @@ const OBJ_X = CUE_X + TABLE.width / 3;
 function makeTwoBallScenario(): BallState[] {
   return [
     cueStrike([CUE_X, CY], [1, 0], 2.0),
-    new BallState([OBJ_X, CY], [0, 0], 0, MotionState.STOPPED, 1),
+    new BallState([OBJ_X, CY], [0, 0], [0, 0], MotionState.STOPPED, 1),
   ];
 }
 

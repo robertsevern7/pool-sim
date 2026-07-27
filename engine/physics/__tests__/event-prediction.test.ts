@@ -91,45 +91,45 @@ test("state change roll to stop detection", () => {
 });
 
 test("state change when stopped detection", () => {
-  const cue = new BallState([0.5, 0.7], [0, 0], 0.0, MotionState.STOPPED);
+  const cue = new BallState([0.5, 0.7], [0, 0], [0, 0], MotionState.STOPPED);
   expect(predictStateTransition(cue)).toBeNull();
 });
 
 // ── predict_ball_ball_collision: base cases ──
 
 test("ball ball collision moving hits stationary", () => {
-  const a = new BallState([0.0, 0.0], [5.0, 0.0], 0.0, MotionState.SLIDING);
-  const b = new BallState([0.2, 0.0], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const a = new BallState([0.0, 0.0], [5.0, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([0.2, 0.0], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   const t = predictBallBallCollision(a, b, G);
   expect(t).not.toBeNull();
   expect(q3(t!)).toBe("0.029");
 });
 
 test("ball ball collision moving away no collision", () => {
-  const a = new BallState([0.5, 0.0], [-2.0, 0.0], 0.0, MotionState.SLIDING);
-  const b = new BallState([1.0, 0.0], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const a = new BallState([0.5, 0.0], [-2.0, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([1.0, 0.0], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   expect(predictBallBallCollision(a, b, G)).toBeNull();
 });
 
 // ── predict_ball_ball_collision: edge cases ──
 
 test("ball ball collision both stopped", () => {
-  const a = new BallState([0.0, 0.0], [0.0, 0.0], 0.0, MotionState.STOPPED);
-  const b = new BallState([1.0, 0.0], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const a = new BallState([0.0, 0.0], [0.0, 0.0], [0, 0], MotionState.STOPPED);
+  const b = new BallState([1.0, 0.0], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   expect(predictBallBallCollision(a, b, G)).toBeNull();
 });
 
 test("ball ball collision parallel same speed", () => {
-  const a = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
-  const b = new BallState([0.0, 0.2], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const a = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([0.0, 0.2], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   expect(predictBallBallCollision(a, b, G)).toBeNull();
 });
 
 // ── predict_ball_ball_collision: self-consistency ──
 
 test("ball ball collision distance equals 2r at collision", () => {
-  const a = new BallState([0.0, 0.0], [5.0, 0.0], 0.0, MotionState.SLIDING);
-  const b = new BallState([0.2, 0.0], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const a = new BallState([0.0, 0.0], [5.0, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([0.2, 0.0], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   const t = predictBallBallCollision(a, b, G)!;
   expect(t).not.toBeNull();
 
@@ -141,24 +141,24 @@ test("ball ball collision distance equals 2r at collision", () => {
 // ── predict_ball_ball_collision: additional base cases ──
 
 test("ball ball collision head on", () => {
-  const a = new BallState([0.0, 0.0], [3.0, 0.0], 0.0, MotionState.SLIDING);
-  const b = new BallState([0.5, 0.0], [-3.0, 0.0], 0.0, MotionState.SLIDING);
+  const a = new BallState([0.0, 0.0], [3.0, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([0.5, 0.0], [-3.0, 0.0], [0, 0], MotionState.SLIDING);
   const t = predictBallBallCollision(a, b, G);
   expect(t).not.toBeNull();
   expect(t!).toBeLessThan(0.1);
 });
 
 test("ball ball collision overtaking", () => {
-  const a = new BallState([0.0, 0.0], [5.0, 0.0], 0.0, MotionState.SLIDING);
-  const b = new BallState([0.2, 0.0], [1.0, 0.0], 0.0, MotionState.SLIDING);
+  const a = new BallState([0.0, 0.0], [5.0, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([0.2, 0.0], [1.0, 0.0], [0, 0], MotionState.SLIDING);
   const t = predictBallBallCollision(a, b, G);
   expect(t).not.toBeNull();
   expect(t!).toBeLessThan(0.1);
 });
 
 test("ball ball collision slow ball stops before reaching", () => {
-  const a = new BallState([0.0, 0.0], [0.1, 0.0], 0.0, MotionState.SLIDING);
-  const b = new BallState([5.0, 0.0], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const a = new BallState([0.0, 0.0], [0.1, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([5.0, 0.0], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   expect(predictBallBallCollision(a, b, G)).toBeNull();
 });
 
@@ -174,7 +174,7 @@ test("compute next event single sliding ball state change", () => {
 });
 
 test("compute next event single rolling ball hits rail", () => {
-  const ball = new BallState([2.5, 0.71], [3.0, 0.0], 0.0, MotionState.ROLLING);
+  const ball = new BallState([2.5, 0.71], [3.0, 0.0], [0, 0], MotionState.ROLLING);
   const state = new SimulationState([ball], 0.0);
   const event = computeNextEvent(state, STANDARD_9_FOOT);
   expect(event).not.toBeNull();
@@ -183,8 +183,8 @@ test("compute next event single rolling ball hits rail", () => {
 });
 
 test("compute next event ball collision first", () => {
-  const a = new BallState([0.5, 0.5], [5.0, 0.0], 0.0, MotionState.SLIDING);
-  const b = new BallState([0.7, 0.5], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const a = new BallState([0.5, 0.5], [5.0, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([0.7, 0.5], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   const state = new SimulationState([a, b], 0.0);
   const event = computeNextEvent(state, STANDARD_9_FOOT);
   expect(event).not.toBeNull();
@@ -194,8 +194,8 @@ test("compute next event ball collision first", () => {
 });
 
 test("compute next event all stopped", () => {
-  const a = new BallState([0.5, 0.5], [0.0, 0.0], 0.0, MotionState.STOPPED);
-  const b = new BallState([1.0, 0.5], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const a = new BallState([0.5, 0.5], [0.0, 0.0], [0, 0], MotionState.STOPPED);
+  const b = new BallState([1.0, 0.5], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   const state = new SimulationState([a, b], 0.0);
   expect(computeNextEvent(state, STANDARD_9_FOOT)).toBeNull();
 });
@@ -210,7 +210,7 @@ test("ball rolling into corner pocket is detected as pocket event", () => {
   const ball = new BallState(
     [TABLE.width - 0.2, 0.2],
     [2.0, -2.0],
-    0.0,
+    [0, 0],
     MotionState.ROLLING,
   );
   const state = new SimulationState([ball], 0.0);
@@ -225,7 +225,7 @@ test("ball rolling into side pocket is detected as pocket event", () => {
   const ball = new BallState(
     [TABLE.width / 2, 0.3],
     [0.0, -3.0],
-    0.0,
+    [0, 0],
     MotionState.ROLLING,
   );
   const state = new SimulationState([ball], 0.0);
@@ -240,7 +240,7 @@ test("ball rolling away from pocket does not trigger pocket event", () => {
   const ball = new BallState(
     [TABLE.width / 2, TABLE.height / 2],
     [-2.0, 0.0],
-    0.0,
+    [0, 0],
     MotionState.ROLLING,
   );
   const state = new SimulationState([ball], 0.0);
@@ -255,7 +255,7 @@ test("ball rolling along rail near pocket does not bounce off rail in pocket zon
   const ball = new BallState(
     [TABLE.width - 0.3, BALL_RADIUS],
     [5.0, 0.0],
-    0.0,
+    [0, 0],
     MotionState.ROLLING,
   );
   const state = new SimulationState([ball], 0.0);

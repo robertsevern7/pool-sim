@@ -7,7 +7,7 @@ import {
   Trajectory,
 } from "./physics/recorder";
 import { cueStrike } from "./physics/motion-models";
-import { Vec2, norm, normalize, sub } from "./physics/vec2";
+import { Vec2, dot, norm, normalize, rotate90, sub } from "./physics/vec2";
 import { analyzeShot, INITIAL_RULES, type GameRules } from "./rules";
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -82,8 +82,12 @@ export type Action =
 
 export function extractCueParams(cueBall: BallState): { speed: number; spin: number } {
   const speed = norm(cueBall.vel);
-  const omega = cueBall.omega;
-  return { speed, spin: speed > 0 ? omega / (MAX_CUE_SPIN * speed) : 0 };
+  if (speed === 0) return { speed, spin: 0 };
+  // Invert cueStrike's omega = rotate90(dir) * spin * MAX_CUE_SPIN * speed by projecting
+  // omega back onto rotate90(dir).
+  const dir = normalize(cueBall.vel);
+  const spinComponent = dot(cueBall.omega, rotate90(dir));
+  return { speed, spin: spinComponent / (MAX_CUE_SPIN * speed) };
 }
 
 export function buildAimedBalls(state: InternalState): BallState[] {
@@ -135,7 +139,7 @@ function previewFromFinalPositions(state: InternalState): InternalState {
     (b) => new BallState(
       b.pos as [number, number],
       [0, 0],
-      0,
+      [0, 0],
       MotionState.STOPPED,
       b.number,
     ),
@@ -237,7 +241,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
       if (state.mode !== "placing") return state;
       const cue = new BallState(
         action.pos as [number, number],
-        [0, 0], 0, MotionState.STOPPED, 0,
+        [0, 0], [0, 0], MotionState.STOPPED, 0,
       );
       const newBalls = [cue, ...state.initialBalls];
       const targetIdx = newBalls.length > 1 ? 1 : null;
@@ -255,7 +259,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
       if (cueBallIdx === -1) return state;
       const updated = state.initialBalls.map((b, i) =>
         i === cueBallIdx
-          ? new BallState(action.pos as [number, number], [0, 0], 0, MotionState.STOPPED, 0)
+          ? new BallState(action.pos as [number, number], [0, 0], [0, 0], MotionState.STOPPED, 0)
           : b,
       );
       return {
@@ -386,7 +390,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
 
         const postShotBalls = finalFrame.balls.map(
           (b) => new BallState(
-            b.pos as [number, number], [0, 0], 0, MotionState.STOPPED, b.number,
+            b.pos as [number, number], [0, 0], [0, 0], MotionState.STOPPED, b.number,
           ),
         );
 
@@ -403,7 +407,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
           const finalBalls = finalFrame.balls
             .filter((b) => b.number !== 0)
             .map((b) => new BallState(
-              b.pos as [number, number], [0, 0], 0, MotionState.STOPPED, b.number,
+              b.pos as [number, number], [0, 0], [0, 0], MotionState.STOPPED, b.number,
             ));
           newState = {
             ...newState,

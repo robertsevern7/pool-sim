@@ -7,7 +7,6 @@ import {
   ballAcceleration,
   timeRollingToStop,
   timeSlidingToRolling,
-  timeToReachPoint,
   timeToTravelDistance,
 } from "./motion-models";
 import { sub, scale, dot, norm, Vec2 } from "./vec2";
@@ -110,12 +109,16 @@ export function isInPocketGap(pos: Vec2, table: Table, pockets: Pocket[]): boole
 function predictRailCollisionPosition(
   ball: BallState,
   table: Table,
-): Vec2 | null {
+): { time: number; position: Vec2 } | null {
   const [vx, vy] = ball.vel;
   const [x, y] = ball.pos;
   const r = ball.radius;
   const a = ballAcceleration(ball, G);
   const pockets = getPockets(table);
+
+  // Acceleration is only constant within the ball's current motion regime, so cap
+  // candidate roots at the next state transition (same approach as predictBallBallCollision).
+  const tMax = predictStateTransition(ball) ?? Infinity;
 
   // Solve for time to reach each rail boundary using exact kinematics:
   // pos(t) = pos + vel*t + 0.5*a*t²
@@ -158,23 +161,23 @@ function predictRailCollisionPosition(
     }
   }
 
-  // Filter out collisions in pocket zones
+  // Filter out collisions in pocket zones and beyond the current motion regime's validity
   const valid = collisions.filter(
-    (c) => c.time > 1e-6 && !isInPocketGap(c.position, table, pockets),
+    (c) => c.time > 1e-6 && c.time <= tMax && !isInPocketGap(c.position, table, pockets),
   );
   if (valid.length === 0) return null;
 
   valid.sort((a, b) => a.time - b.time);
-  return valid[0].position;
+  return valid[0];
 }
 
 export function predictRailCollision(
   ball: BallState,
   table: Table,
 ): number | null {
-  const pos = predictRailCollisionPosition(ball, table);
-  if (pos === null) return null;
-  return timeToReachPoint(ball, pos, G);
+  const result = predictRailCollisionPosition(ball, table);
+  if (result === null) return null;
+  return result.time;
 }
 
 export function predictStateTransition(ball: BallState): number | null {
@@ -221,6 +224,11 @@ export function linePocketIntersection(
   return null;
 }
 
+// NOTE: assumes the ball travels in a straight line (current velocity direction) to the
+// pocket's fall circle. This is exact once a ball is ROLLING, but only an approximation
+// during SLIDING when the ball is curving off spin picked up in a prior collision (see
+// slidingMotion in motion-models.ts). The error is bounded to the short sliding sub-phase
+// and is treated as an acceptable known limitation rather than solved exactly here.
 function predictPocketEntry(
   ball: BallState,
   table: Table,

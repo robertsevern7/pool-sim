@@ -3,7 +3,7 @@ import { BALL_RADIUS, G, STANDARD_9_FOOT } from "../constants";
 import { cueStrike, rollingMotion, slidingMotion } from "../motion-models";
 import { SimulationState } from "../simulation-state";
 import { advanceState, simulate } from "../simulator";
-import { norm } from "../vec2";
+import { norm, sub } from "../vec2";
 
 function q3(n: number): string {
   return n.toFixed(3);
@@ -12,11 +12,11 @@ function q3(n: number): string {
 // ── advance_state: base cases ──
 
 test("advance state single sliding ball", () => {
-  const ball = new BallState([1.0, 0.7], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const ball = new BallState([1.0, 0.7], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const state = new SimulationState([ball], 0.0);
   const dt = 0.1;
   const exp = slidingMotion(
-    new BallState([1.0, 0.7], [2.0, 0.0], 0.0, MotionState.SLIDING),
+    new BallState([1.0, 0.7], [2.0, 0.0], [0, 0], MotionState.SLIDING),
     dt,
     G,
   );
@@ -25,15 +25,15 @@ test("advance state single sliding ball", () => {
   expect(ball.pos[1]).toBeCloseTo(exp.pos[1], 6);
   expect(ball.vel[0]).toBeCloseTo(exp.vel[0], 6);
   expect(ball.vel[1]).toBeCloseTo(exp.vel[1], 6);
-  expect(Math.abs(ball.omega - exp.omega)).toBeLessThan(1e-9);
+  expect(norm(sub(ball.omega, exp.omega))).toBeLessThan(1e-9);
 });
 
 test("advance state single rolling ball", () => {
-  const ball = new BallState([1.0, 0.7], [2.0, 0.0], 0.0, MotionState.ROLLING);
+  const ball = new BallState([1.0, 0.7], [2.0, 0.0], [0, 0], MotionState.ROLLING);
   const state = new SimulationState([ball], 0.0);
   const dt = 0.1;
   const exp = rollingMotion(
-    new BallState([1.0, 0.7], [2.0, 0.0], 0.0, MotionState.ROLLING),
+    new BallState([1.0, 0.7], [2.0, 0.0], [0, 0], MotionState.ROLLING),
     dt,
     G,
   );
@@ -42,21 +42,21 @@ test("advance state single rolling ball", () => {
   expect(ball.pos[1]).toBeCloseTo(exp.pos[1], 6);
   expect(ball.vel[0]).toBeCloseTo(exp.vel[0], 6);
   expect(ball.vel[1]).toBeCloseTo(exp.vel[1], 6);
-  expect(Math.abs(ball.omega - exp.omega)).toBeLessThan(1e-9);
+  expect(norm(sub(ball.omega, exp.omega))).toBeLessThan(1e-9);
 });
 
 test("advance state mixed balls", () => {
-  const sliding = new BallState([0.5, 0.5], [2.0, 0.0], 0.0, MotionState.SLIDING);
-  const rolling = new BallState([1.5, 0.5], [1.0, 0.0], 0.0, MotionState.ROLLING);
+  const sliding = new BallState([0.5, 0.5], [2.0, 0.0], [0, 0], MotionState.SLIDING);
+  const rolling = new BallState([1.5, 0.5], [1.0, 0.0], [0, 0], MotionState.ROLLING);
   const state = new SimulationState([sliding, rolling], 0.0);
   const dt = 0.05;
   const expS = slidingMotion(
-    new BallState([0.5, 0.5], [2.0, 0.0], 0.0, MotionState.SLIDING),
+    new BallState([0.5, 0.5], [2.0, 0.0], [0, 0], MotionState.SLIDING),
     dt,
     G,
   );
   const expR = rollingMotion(
-    new BallState([1.5, 0.5], [1.0, 0.0], 0.0, MotionState.ROLLING),
+    new BallState([1.5, 0.5], [1.0, 0.0], [0, 0], MotionState.ROLLING),
     dt,
     G,
   );
@@ -70,7 +70,7 @@ test("advance state mixed balls", () => {
 // ── advance_state: edge cases ──
 
 test("advance state stopped ball unchanged", () => {
-  const ball = new BallState([1.0, 0.7], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const ball = new BallState([1.0, 0.7], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   const state = new SimulationState([ball], 0.0);
   advanceState(state, 0.1);
   expect(ball.pos[0]).toBe(1.0);
@@ -80,7 +80,7 @@ test("advance state stopped ball unchanged", () => {
 });
 
 test("advance state updates time", () => {
-  const ball = new BallState([1.0, 0.7], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const ball = new BallState([1.0, 0.7], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   const state = new SimulationState([ball], 1.5);
   advanceState(state, 0.3);
   expect(q3(state.time)).toBe("1.800");
@@ -99,7 +99,7 @@ test("simulate single ball slides rolls stops", () => {
 });
 
 test("simulate ball hits rail and stops", () => {
-  const ball = new BallState([2.5, 0.71], [3.0, 0.0], 0.0, MotionState.ROLLING);
+  const ball = new BallState([2.5, 0.71], [3.0, 0.0], [0, 0], MotionState.ROLLING);
   const state = new SimulationState([ball], 0.0);
   simulate(state, STANDARD_9_FOOT);
   expect(ball.motion).toBe(MotionState.STOPPED);
@@ -109,8 +109,8 @@ test("simulate ball hits rail and stops", () => {
 // ── simulate: edge cases ──
 
 test("simulate all stopped immediately", () => {
-  const a = new BallState([0.5, 0.5], [0.0, 0.0], 0.0, MotionState.STOPPED);
-  const b = new BallState([1.5, 0.5], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const a = new BallState([0.5, 0.5], [0.0, 0.0], [0, 0], MotionState.STOPPED);
+  const b = new BallState([1.5, 0.5], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   const state = new SimulationState([a, b], 0.0);
   simulate(state, STANDARD_9_FOOT);
   expect(state.time).toBe(0.0);

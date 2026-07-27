@@ -105,7 +105,7 @@ test("time sliding to rolling hard", () => {
 });
 
 test("time sliding to rolling zero velocity throws", () => {
-  const cue = new BallState([0.5, 0.7], [0, 0], 0.0, MotionState.SLIDING);
+  const cue = new BallState([0.5, 0.7], [0, 0], [0, 0], MotionState.SLIDING);
   expect(() => timeSlidingToRolling(cue, G)).toThrow();
 });
 
@@ -138,7 +138,7 @@ test("state after sliding", () => {
 // ── sliding_motion: base cases ──
 
 test("sliding motion x axis", () => {
-  const cue = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const cue = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const { pos, vel } = slidingMotion(cue, 0.1, G);
   expect(q3(pos[0])).toBe("0.190");
   expect(q3(pos[1])).toBe("0.000");
@@ -147,7 +147,7 @@ test("sliding motion x axis", () => {
 });
 
 test("sliding motion angled", () => {
-  const cue = new BallState([0.0, 0.0], [1.0, 1.0], 0.0, MotionState.SLIDING);
+  const cue = new BallState([0.0, 0.0], [1.0, 1.0], [0, 0], MotionState.SLIDING);
   const { pos, vel } = slidingMotion(cue, 0.1, G);
   expect(q3(pos[0])).toBe("0.093");
   expect(q3(pos[1])).toBe("0.093");
@@ -158,7 +158,7 @@ test("sliding motion angled", () => {
 // ── sliding_motion: edge cases ──
 
 test("sliding motion zero velocity returns unchanged", () => {
-  const cue = new BallState([1.0, 2.0], [0.0, 0.0], 0.0, MotionState.SLIDING);
+  const cue = new BallState([1.0, 2.0], [0.0, 0.0], [0, 0], MotionState.SLIDING);
   const { pos, vel } = slidingMotion(cue, 0.5, G);
   expect(pos[0]).toBe(1.0);
   expect(pos[1]).toBe(2.0);
@@ -167,7 +167,7 @@ test("sliding motion zero velocity returns unchanged", () => {
 });
 
 test("sliding motion t zero", () => {
-  const cue = new BallState([1.0, 2.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const cue = new BallState([1.0, 2.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const { pos, vel } = slidingMotion(cue, 0.0, G);
   expect(pos[0]).toBe(1.0);
   expect(pos[1]).toBe(2.0);
@@ -178,9 +178,9 @@ test("sliding motion t zero", () => {
 // ── sliding_motion: self-consistency ──
 
 test("sliding motion decelerates monotonically", () => {
-  const cue1 = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const cue1 = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const { vel: vel1 } = slidingMotion(cue1, 0.1, G);
-  const cue2 = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const cue2 = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const { vel: vel2 } = slidingMotion(cue2, 0.2, G);
   expect(norm(vel1)).toBeGreaterThan(norm(vel2));
 });
@@ -218,17 +218,17 @@ test("rolling to stop time hard", () => {
 });
 
 test("rolling to stop time isolated", () => {
-  const cue = new BallState([0.5, 0.7], [2.0, 0.0], 0.0, MotionState.ROLLING);
+  const cue = new BallState([0.5, 0.7], [2.0, 0.0], [0, 0], MotionState.ROLLING);
   expect(q3(timeRollingToStop(cue, G))).toBe("6.796");
 });
 
 test("time rolling to stop zero velocity throws", () => {
-  const cue = new BallState([0.5, 0.7], [0, 0], 0.0, MotionState.ROLLING);
+  const cue = new BallState([0.5, 0.7], [0, 0], [0, 0], MotionState.ROLLING);
   expect(() => timeRollingToStop(cue, G)).toThrow();
 });
 
 test("rolling velocity is zero at stop time", () => {
-  const cue = new BallState([0.5, 0.7], [2.0, 0.0], 0.0, MotionState.ROLLING);
+  const cue = new BallState([0.5, 0.7], [2.0, 0.0], [0, 0], MotionState.ROLLING);
   const t = timeRollingToStop(cue, G);
   const { vel } = rollingMotion(cue, t, G);
   expect(q3(norm(vel))).toBe("0.000");
@@ -273,7 +273,7 @@ test("state after rolling angled", () => {
 // ── rolling_motion: base cases ──
 
 test("rolling motion x axis", () => {
-  const cue = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.ROLLING);
+  const cue = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.ROLLING);
   const { pos, vel } = rollingMotion(cue, 0.5, G);
   expect(q3(pos[0])).toBe("0.963");
   expect(q3(pos[1])).toBe("0.000");
@@ -284,7 +284,7 @@ test("rolling motion x axis", () => {
 // ── rolling_motion: edge cases ──
 
 test("rolling motion zero velocity returns unchanged", () => {
-  const cue = new BallState([1.0, 2.0], [0.0, 0.0], 0.0, MotionState.ROLLING);
+  const cue = new BallState([1.0, 2.0], [0.0, 0.0], [0, 0], MotionState.ROLLING);
   const { pos, vel } = rollingMotion(cue, 0.5, G);
   expect(pos[0]).toBe(1.0);
   expect(pos[1]).toBe(2.0);
@@ -293,7 +293,7 @@ test("rolling motion zero velocity returns unchanged", () => {
 });
 
 test("rolling motion t zero", () => {
-  const cue = new BallState([1.0, 2.0], [2.0, 0.0], 0.0, MotionState.ROLLING);
+  const cue = new BallState([1.0, 2.0], [2.0, 0.0], [0, 0], MotionState.ROLLING);
   const { pos, vel } = rollingMotion(cue, 0.0, G);
   expect(pos[0]).toBe(1.0);
   expect(pos[1]).toBe(2.0);
@@ -309,74 +309,76 @@ test("time sliding to rolling stun shot", () => {
 });
 
 test("time sliding to rolling draw", () => {
-  const cue = new BallState([0.5, 0.7], [2.0, 0.0], -20.0, MotionState.SLIDING);
+  const cue = new BallState([0.5, 0.7], [2.0, 0.0], [0, -20.0], MotionState.SLIDING);
   expect(q3(timeSlidingToRolling(cue, G))).toBe("0.374");
 });
 
 test("time sliding to rolling topspin", () => {
-  const cue = new BallState([0.5, 0.7], [2.0, 0.0], 100.0, MotionState.SLIDING);
+  const cue = new BallState([0.5, 0.7], [2.0, 0.0], [0, 100.0], MotionState.SLIDING);
   expect(q3(timeSlidingToRolling(cue, G))).toBe("0.125");
 });
 
 test("sliding to rolling self consistency v equals r omega", () => {
-  const cue = new BallState([0.5, 0.7], [2.0, 0.0], -20.0, MotionState.SLIDING);
+  const cue = new BallState([0.5, 0.7], [2.0, 0.0], [0, -20.0], MotionState.SLIDING);
   const t = timeSlidingToRolling(cue, G);
   const { vel, omega } = slidingMotion(cue, t, G);
   const speed = norm(vel);
-  expect(q3(speed)).toBe(q3(cue.radius * omega));
+  expect(q3(speed)).toBe(q3(cue.radius * norm(omega)));
 });
 
 test("sliding motion backspin omega increases", () => {
-  const cue = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const cue = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const { omega } = slidingMotion(cue, 0.1, G);
-  expect(omega).toBeGreaterThan(0.0);
+  expect(omega[1]).toBeGreaterThan(0.0);
+  expect(omega[0]).toBeCloseTo(0, 9);
 });
 
 test("sliding motion topspin omega decreases", () => {
-  const cue = new BallState([0.0, 0.0], [2.0, 0.0], 100.0, MotionState.SLIDING);
+  const cue = new BallState([0.0, 0.0], [2.0, 0.0], [0, 100.0], MotionState.SLIDING);
   const { omega } = slidingMotion(cue, 0.1, G);
-  expect(omega).toBeLessThan(100.0);
+  expect(omega[1]).toBeLessThan(100.0);
+  expect(omega[0]).toBeCloseTo(0, 9);
 });
 
 test("sliding motion topspin self consistency v equals r omega", () => {
-  const cue = new BallState([0.5, 0.7], [2.0, 0.0], 100.0, MotionState.SLIDING);
+  const cue = new BallState([0.5, 0.7], [2.0, 0.0], [0, 100.0], MotionState.SLIDING);
   const t = timeSlidingToRolling(cue, G);
   const { vel, omega } = slidingMotion(cue, t, G);
-  expect(q3(norm(vel))).toBe(q3(cue.radius * omega));
+  expect(q3(norm(vel))).toBe(q3(cue.radius * norm(omega)));
 });
 
 // ── ball_acceleration ──
 
 test("ball acceleration sliding stun", () => {
-  const ball = new BallState([0, 0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const ball = new BallState([0, 0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const a = ballAcceleration(ball, G);
   expect(q3(a[0])).toBe("-1.962");
   expect(q3(a[1])).toBe("0.000");
 });
 
 test("ball acceleration sliding topspin", () => {
-  const ball = new BallState([0, 0], [2.0, 0.0], 100.0, MotionState.SLIDING);
+  const ball = new BallState([0, 0], [2.0, 0.0], [0, 100.0], MotionState.SLIDING);
   const a = ballAcceleration(ball, G);
   expect(q3(a[0])).toBe("1.962");
   expect(q3(a[1])).toBe("0.000");
 });
 
 test("ball acceleration rolling", () => {
-  const ball = new BallState([0, 0], [2.0, 0.0], 0.0, MotionState.ROLLING);
+  const ball = new BallState([0, 0], [2.0, 0.0], [0, 0], MotionState.ROLLING);
   const a = ballAcceleration(ball, G);
   expect(q3(a[0])).toBe("-0.294");
   expect(q3(a[1])).toBe("0.000");
 });
 
 test("ball acceleration stopped", () => {
-  const ball = new BallState([0, 0], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const ball = new BallState([0, 0], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   const a = ballAcceleration(ball, G);
   expect(a[0]).toBe(0.0);
   expect(a[1]).toBe(0.0);
 });
 
 test("ball acceleration zero velocity sliding", () => {
-  const ball = new BallState([0, 0], [0.0, 0.0], 0.0, MotionState.SLIDING);
+  const ball = new BallState([0, 0], [0.0, 0.0], [0, 0], MotionState.SLIDING);
   const a = ballAcceleration(ball, G);
   expect(a[0]).toBe(0.0);
   expect(a[1]).toBe(0.0);
@@ -385,41 +387,41 @@ test("ball acceleration zero velocity sliding", () => {
 // ── time_to_reach_point ──
 
 test("time to reach point sliding", () => {
-  const ball = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const ball = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const t = timeToReachPoint(ball, [0.19, 0.0], G);
   expect(t).not.toBeNull();
   expect(q3(t!)).toBe("0.100");
 });
 
 test("time to reach point rolling", () => {
-  const ball = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.ROLLING);
+  const ball = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.ROLLING);
   const t = timeToReachPoint(ball, [0.988, 0.0], G);
   expect(t).not.toBeNull();
   expect(q3(t!)).toBe("0.513");
 });
 
 test("time to reach point stopped", () => {
-  const ball = new BallState([0.0, 0.0], [0.0, 0.0], 0.0, MotionState.STOPPED);
+  const ball = new BallState([0.0, 0.0], [0.0, 0.0], [0, 0], MotionState.STOPPED);
   expect(timeToReachPoint(ball, [1.0, 0.0], G)).toBeNull();
 });
 
 test("time to reach point already at target", () => {
-  const ball = new BallState([1.0, 1.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const ball = new BallState([1.0, 1.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   expect(timeToReachPoint(ball, [1.0, 1.0], G)).toBe(0.0);
 });
 
 test("time to reach point moving away", () => {
-  const ball = new BallState([0.0, 0.0], [-2.0, 0.0], 0.0, MotionState.SLIDING);
+  const ball = new BallState([0.0, 0.0], [-2.0, 0.0], [0, 0], MotionState.SLIDING);
   expect(timeToReachPoint(ball, [1.0, 0.0], G)).toBeNull();
 });
 
 test("time to reach point stops before target", () => {
-  const ball = new BallState([0.0, 0.0], [0.1, 0.0], 0.0, MotionState.SLIDING);
+  const ball = new BallState([0.0, 0.0], [0.1, 0.0], [0, 0], MotionState.SLIDING);
   expect(timeToReachPoint(ball, [100.0, 0.0], G)).toBeNull();
 });
 
 test("time to reach point position at time equals target", () => {
-  const ball = new BallState([0.0, 0.0], [2.0, 0.0], 0.0, MotionState.SLIDING);
+  const ball = new BallState([0.0, 0.0], [2.0, 0.0], [0, 0], MotionState.SLIDING);
   const target: [number, number] = [0.19, 0.0];
   const t = timeToReachPoint(ball, target, G)!;
   const { pos } = slidingMotion(ball, t, G);
@@ -431,17 +433,17 @@ test("time to reach point position at time equals target", () => {
 
 describe("timeToTravelDistance", () => {
   test("stopped ball returns null", () => {
-    const ball = new BallState([1, 1], [0, 0], 0, MotionState.STOPPED);
+    const ball = new BallState([1, 1], [0, 0], [0, 0], MotionState.STOPPED);
     expect(timeToTravelDistance(ball, 0.5, G)).toBeNull();
   });
 
   test("zero distance returns 0", () => {
-    const ball = new BallState([1, 1], [1, 0], 0, MotionState.ROLLING);
+    const ball = new BallState([1, 1], [1, 0], [0, 0], MotionState.ROLLING);
     expect(timeToTravelDistance(ball, 0, G)).toBe(0);
   });
 
   test("rolling ball reaches a short distance", () => {
-    const ball = new BallState([1, 1], [2, 0], 0, MotionState.ROLLING);
+    const ball = new BallState([1, 1], [2, 0], [0, 0], MotionState.ROLLING);
     const t = timeToTravelDistance(ball, 0.1, G);
     expect(t).not.toBeNull();
     expect(t).toBeGreaterThan(0);
@@ -454,7 +456,7 @@ describe("timeToTravelDistance", () => {
 
   test("ball that stops before reaching distance returns null", () => {
     // Very slow ball, long distance
-    const ball = new BallState([1, 1], [0.1, 0], 0, MotionState.ROLLING);
+    const ball = new BallState([1, 1], [0.1, 0], [0, 0], MotionState.ROLLING);
     const t = timeToTravelDistance(ball, 10, G);
     expect(t).toBeNull();
   });
@@ -468,7 +470,7 @@ describe("timeToTravelDistance", () => {
   });
 
   test("agrees with timeToReachPoint for straight-line case", () => {
-    const ball = new BallState([0, 0], [1, 0], 0, MotionState.ROLLING);
+    const ball = new BallState([0, 0], [1, 0], [0, 0], MotionState.ROLLING);
     const target: [number, number] = [0.5, 0];
     const t1 = timeToReachPoint(ball, target, G);
     const t2 = timeToTravelDistance(ball, 0.5, G);

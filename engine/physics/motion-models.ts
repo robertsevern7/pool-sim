@@ -1,6 +1,6 @@
 import { BallState, MotionState } from "./ball-state";
 import { MAX_CUE_SPIN } from "./constants";
-import { Vec2, add, norm, normalize, roundVec, scale } from "./vec2";
+import { Vec2, add, norm, normalize, roundVec, rotate90, scale } from "./vec2";
 
 const POSITION_DP = 6;
 
@@ -10,16 +10,16 @@ export function ballAcceleration(ball: BallState, g: number): Vec2 {
   const speed = norm(ball.vel);
   if (speed === 0) return [0, 0];
 
-  const direction = scale(ball.vel, 1 / speed);
-
   if (ball.motion === MotionState.ROLLING) {
+    const direction = scale(ball.vel, 1 / speed);
     return scale(direction, -ball.mu()! * g);
   }
 
-  // Sliding: friction opposes slip direction
-  const slip = speed - ball.radius * ball.omega;
-  const s = slip >= 0 ? 1.0 : -1.0;
-  return scale(direction, -s * ball.mu()! * g);
+  // Sliding: friction opposes the contact-point slip velocity. This is generally
+  // NOT colinear with vel — e.g. right after a collision, vel jumps to the tangent
+  // direction but omega (spin axis) is unchanged, so the ball curves as it slides.
+  const slipDir = normalize(add(ball.vel, scale(rotate90(ball.omega), ball.radius)));
+  return scale(slipDir, -ball.mu()! * g);
 }
 
 export function cueStrike(
@@ -29,7 +29,7 @@ export function cueStrike(
   spin: number = 0.0,
 ): BallState {
   if (speed === 0) {
-    return new BallState(position, [0, 0], 0, MotionState.STOPPED);
+    return new BallState(position, [0, 0], [0, 0], MotionState.STOPPED);
   }
 
   const n = norm(direction);
@@ -42,7 +42,7 @@ export function cueStrike(
 
   const dir = normalize(direction);
   const vel: Vec2 = scale(dir, speed);
-  const omega = spin * MAX_CUE_SPIN * speed;
+  const omega = scale(rotate90(dir), spin * MAX_CUE_SPIN * speed);
 
   return new BallState(position, vel, omega, MotionState.SLIDING);
 }
@@ -51,7 +51,7 @@ export function slidingMotion(
   ball: BallState,
   t: number,
   g: number,
-): { pos: Vec2; vel: Vec2; omega: number } {
+): { pos: Vec2; vel: Vec2; omega: Vec2 } {
   const v0 = ball.vel;
   const speed = norm(v0);
 
@@ -59,12 +59,10 @@ export function slidingMotion(
     return { pos: ball.pos, vel: ball.vel, omega: ball.omega };
   }
 
-  const direction = scale(v0, 1 / speed);
+  const u0 = add(v0, scale(rotate90(ball.omega), ball.radius));
+  const uHat = normalize(u0);
 
-  const slip = speed - ball.radius * ball.omega;
-  const s = slip >= 0 ? 1.0 : -1.0;
-
-  const a = scale(direction, -s * ball.mu()! * g);
+  const a = scale(uHat, -ball.mu()! * g);
 
   const newVel: Vec2 = add(v0, scale(a, t));
   const newPos = roundVec(
@@ -72,8 +70,8 @@ export function slidingMotion(
     POSITION_DP,
   );
 
-  const alpha = (s * (5 * ball.mu()! * g)) / (2 * ball.radius);
-  const newOmega = ball.omega + alpha * t;
+  const alpha = scale(rotate90(uHat), (5 * ball.mu()! * g) / (2 * ball.radius));
+  const newOmega = add(ball.omega, scale(alpha, t));
 
   return { pos: newPos, vel: newVel, omega: newOmega };
 }
@@ -82,7 +80,7 @@ export function rollingMotion(
   ball: BallState,
   t: number,
   g: number,
-): { pos: Vec2; vel: Vec2; omega: number } {
+): { pos: Vec2; vel: Vec2; omega: Vec2 } {
   const v = ball.vel;
   const speed = norm(v);
 
@@ -98,7 +96,8 @@ export function rollingMotion(
     POSITION_DP,
   );
   const vel = add(v, scale(a, t));
-  const omega = norm(vel) / ball.radius;
+  // Rolling without slipping: omega stays locked to the rolling-constraint direction as vel decays.
+  const omega = scale(rotate90(vel), 1 / ball.radius);
 
   return { pos, vel, omega };
 }
@@ -206,7 +205,7 @@ export function timeSlidingToRolling(ball: BallState, g: number): number {
   if (v0 === 0) {
     throw new Error("ball is sliding with zero velocity");
   }
-  const slip = Math.abs(v0 - ball.radius * ball.omega);
+  const slip = norm(add(ball.vel, scale(rotate90(ball.omega), ball.radius)));
   return (2 * slip) / (7 * ball.mu()! * g);
 }
 
