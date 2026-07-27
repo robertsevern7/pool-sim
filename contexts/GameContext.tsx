@@ -40,6 +40,7 @@ export interface GameState {
   targetBallIndex: number | null;
   power: number;
   spin: number;
+  sidespin: number;
   shotsTaken: number;
   rules: GameRules;
   /** Snapshots for the shot history carousel */
@@ -57,7 +58,7 @@ export interface GameDispatch {
   aimAtPoint: (point: Vec2) => void;
   adjustAngle: (delta: number) => void;
   setPower: (power: number) => void;
-  setSpin: (spin: number) => void;
+  setTipOffset: (spin: number, sidespin: number) => void;
   placeCue: (pos: Vec2) => void;
   moveCue: (pos: Vec2) => void;
   finishMoveCue: () => void;
@@ -129,6 +130,7 @@ export function GameProvider({ initialBalls, placeCue, children }: GameProviderP
     targetBallIndex: state.targetBallIndex,
     power: state.power,
     spin: state.cueSpin,
+    sidespin: state.cueSidespin,
     shotsTaken: state.shotsTaken,
     rules: state.rules,
     shotSnapshots: state.shotHistory.map((s) => ({
@@ -147,7 +149,10 @@ export function GameProvider({ initialBalls, placeCue, children }: GameProviderP
     aimAtPoint: useCallback((point: Vec2) => dispatch({ type: "AIM_AT_POINT", point }), []),
     adjustAngle: useCallback((delta: number) => dispatch({ type: "ADJUST_ANGLE", delta }), []),
     setPower: useCallback((power: number) => dispatch({ type: "SET_POWER", power }), []),
-    setSpin: useCallback((spin: number) => dispatch({ type: "SET_SPIN", spin }), []),
+    setTipOffset: useCallback(
+      (spin: number, sidespin: number) => dispatch({ type: "SET_TIP_OFFSET", spin, sidespin }),
+      [],
+    ),
     placeCue: useCallback((pos: Vec2) => dispatch({ type: "PLACE_CUE", pos }), []),
     moveCue: useCallback((pos: Vec2) => dispatch({ type: "MOVE_CUE", pos }), []),
     finishMoveCue: useCallback(() => dispatch({ type: "FINISH_MOVE_CUE" }), []),

@@ -9,15 +9,15 @@ import PowerSlider from "./PowerSlider";
 import { strings } from "../constants/strings";
 
 export default function ShotControls() {
-  const { mode, power, spin, rules } = useGame();
-  const { shoot, setPower, setSpin } = useGameDispatch();
+  const { mode, power, spin, sidespin, rules } = useGame();
+  const { shoot, setPower, setTipOffset } = useGameDispatch();
   const isPlaying = mode === "playing";
   const disabled = isPlaying || rules.foul !== null || rules.result !== null;
 
   return (
     <View style={styles.controlBar}>
       <View style={styles.side}>
-        <CueBallControl spin={spin} onSpinChange={setSpin} disabled={disabled} />
+        <CueBallControl spin={spin} sidespin={sidespin} onTipOffsetChange={setTipOffset} disabled={disabled} />
       </View>
 
       <Pressable

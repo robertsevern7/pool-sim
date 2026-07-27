@@ -9,6 +9,64 @@ const CY = TABLE.height / 2;
 
 // ── recordTrajectories: structure ──
 
+// ── spinZ (sidespin) survives the internal deep copy ──
+//
+// recordSimulation/recordTrajectories deep-copy their input balls before simulating (so the
+// caller's originals aren't mutated). That copy used to only carry over pos/vel/omega/motion/
+// number, silently dropping spinZ — meaning a scenario built with english would show no throw
+// once run through this module, even though the physics engine itself handles it correctly.
+
+test("recordSimulation preserves cue ball sidespin through its internal deep copy", () => {
+  const cueX = TABLE.width / 3;
+  const objX = cueX + TABLE.width / 3;
+
+  const withSidespin = recordSimulation(
+    [
+      cueStrike([cueX, CY], [1, 0], 3.0, 0, 0.8),
+      new BallState([objX, CY + 0.02], [0, 0], [0, 0], MotionState.STOPPED, 1),
+    ],
+    TABLE,
+  );
+  const withoutSidespin = recordSimulation(
+    [
+      cueStrike([cueX, CY], [1, 0], 3.0, 0, 0),
+      new BallState([objX, CY + 0.02], [0, 0], [0, 0], MotionState.STOPPED, 1),
+    ],
+    TABLE,
+  );
+
+  const finalWith = withSidespin.frames[withSidespin.frames.length - 1].balls.find((b) => b.number === 1)!;
+  const finalWithout = withoutSidespin.frames[withoutSidespin.frames.length - 1].balls.find((b) => b.number === 1)!;
+
+  // If spinZ had been dropped by the deep copy, both runs would land the object ball in
+  // exactly the same place.
+  expect(finalWith.pos[0]).not.toBeCloseTo(finalWithout.pos[0], 4);
+});
+
+test("recordTrajectories preserves cue ball sidespin through its internal deep copy", () => {
+  const cueX = TABLE.width / 3;
+  const objX = cueX + TABLE.width / 3;
+
+  const withSidespin = recordTrajectories(
+    [
+      cueStrike([cueX, CY], [1, 0], 3.0, 0, 0.8),
+      new BallState([objX, CY + 0.02], [0, 0], [0, 0], MotionState.STOPPED, 1),
+    ],
+    TABLE,
+  );
+  const withoutSidespin = recordTrajectories(
+    [
+      cueStrike([cueX, CY], [1, 0], 3.0, 0, 0),
+      new BallState([objX, CY + 0.02], [0, 0], [0, 0], MotionState.STOPPED, 1),
+    ],
+    TABLE,
+  );
+
+  const lastWith = withSidespin[1][withSidespin[1].length - 1];
+  const lastWithout = withoutSidespin[1][withoutSidespin[1].length - 1];
+  expect(lastWith.pos[0]).not.toBeCloseTo(lastWithout.pos[0], 4);
+});
+
 test("single stopped ball produces no trajectory (length < 2)", () => {
   const ball = new BallState([1.0, CY], [0, 0], [0, 0], MotionState.STOPPED);
   const trajs = recordTrajectories([ball], TABLE);

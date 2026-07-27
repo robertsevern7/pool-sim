@@ -73,7 +73,7 @@ export function recordTrajectories(
   table: Table,
 ): Trajectory[] {
   const balls = initialBalls.map(
-    (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion, b.number),
+    (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion, b.number, b.spinZ),
   );
   const state = new SimulationState(balls, 0);
   const maxEvents = 10000;
@@ -162,7 +162,7 @@ export function recordSimulation(
 ): SimulationResult {
   // Deep copy initial balls so we don't mutate the originals
   const balls = initialBalls.map(
-    (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion, b.number),
+    (b) => new BallState([b.pos[0], b.pos[1]], [b.vel[0], b.vel[1]], b.omega, b.motion, b.number, b.spinZ),
   );
   const state = new SimulationState(balls, 0);
   const interval = 1 / fps;

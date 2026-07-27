@@ -1,5 +1,5 @@
 import { BallState, MotionState } from "../ball-state";
-import { G } from "../constants";
+import { G, MAX_CUE_SPIN } from "../constants";
 import {
   ballAcceleration,
   cueStrike,
@@ -65,6 +65,48 @@ test("cue strike zero speed", () => {
 
 test("cue strike zero direction throws", () => {
   expect(() => cueStrike([0.5, 0.7], [0, 0], 2.0)).toThrow();
+});
+
+// ── cue_strike: sidespin (english) ──
+
+test("cue strike with no sidespin has zero spinZ", () => {
+  const cue = cueStrike([0.5, 0.7], [1, 0], 2.0, 0.5);
+  expect(cue.spinZ).toBe(0);
+});
+
+test("cue strike sidespin sets spinZ proportional to speed", () => {
+  const cue = cueStrike([0.5, 0.7], [1, 0], 2.0, 0, 0.5);
+  expect(q3(cue.spinZ)).toBe(q3(0.5 * MAX_CUE_SPIN * 2.0));
+});
+
+test("cue strike max sidespin", () => {
+  const cue = cueStrike([0.5, 0.7], [1, 0], 3.0, 0, 1.0);
+  expect(q3(cue.spinZ)).toBe(q3(MAX_CUE_SPIN * 3.0));
+});
+
+test("cue strike negative sidespin gives negative spinZ", () => {
+  const cue = cueStrike([0.5, 0.7], [1, 0], 2.0, 0, -0.5);
+  expect(cue.spinZ).toBeLessThan(0);
+});
+
+test("cue strike sidespin out of range throws", () => {
+  expect(() => cueStrike([0.5, 0.7], [1, 0], 2.0, 0, 1.5)).toThrow();
+  expect(() => cueStrike([0.5, 0.7], [1, 0], 2.0, 0, -1.5)).toThrow();
+});
+
+test("cue strike combined spin and sidespin within miscue limit is fine", () => {
+  expect(() => cueStrike([0.5, 0.7], [1, 0], 2.0, 0.6, 0.6)).not.toThrow();
+});
+
+test("cue strike combined spin and sidespin beyond miscue limit throws", () => {
+  expect(() => cueStrike([0.5, 0.7], [1, 0], 2.0, 0.9, 0.9)).toThrow();
+});
+
+test("cue strike sidespin does not affect vel or omega", () => {
+  const withSidespin = cueStrike([0.5, 0.7], [1, 0], 2.0, 0.3, 0.7);
+  const without = cueStrike([0.5, 0.7], [1, 0], 2.0, 0.3);
+  expect(withSidespin.vel).toEqual(without.vel);
+  expect(withSidespin.omega).toEqual(without.omega);
 });
 
 test("cue strike unnormalized direction", () => {

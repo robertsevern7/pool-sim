@@ -8,18 +8,20 @@ const BORDER = 2;
 interface CueBallControlProps {
   /** Vertical spin: -1 (draw) to 1 (follow) */
   spin: number;
-  onSpinChange: (spin: number) => void;
+  /** Horizontal spin (English): -1 (left) to 1 (right) */
+  sidespin: number;
+  onTipOffsetChange: (spin: number, sidespin: number) => void;
   disabled?: boolean;
 }
 
-export default function CueBallControl({ spin, onSpinChange, disabled }: CueBallControlProps) {
+export default function CueBallControl({ spin, sidespin, onTipOffsetChange, disabled }: CueBallControlProps) {
   const [size, setSize] = useState(0);
   const radius = size / 2;
   const innerRadius = radius * INNER_RATIO;
   const dotSize = Math.max(size * DOT_RATIO, 6);
 
-  const callbackRef = useRef(onSpinChange);
-  callbackRef.current = onSpinChange;
+  const callbackRef = useRef(onTipOffsetChange);
+  callbackRef.current = onTipOffsetChange;
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
   const sizeRef = useRef({ radius, innerRadius });
@@ -29,18 +31,29 @@ export default function CueBallControl({ spin, onSpinChange, disabled }: CueBall
     PanResponder.create({
       onStartShouldSetPanResponder: () => !disabledRef.current,
       onMoveShouldSetPanResponder: () => !disabledRef.current,
-      onPanResponderGrant: (e) => updateSpin(e.nativeEvent.locationY),
-      onPanResponderMove: (e) => updateSpin(e.nativeEvent.locationY),
+      onPanResponderGrant: (e) => updateTipOffset(e.nativeEvent.locationX, e.nativeEvent.locationY),
+      onPanResponderMove: (e) => updateTipOffset(e.nativeEvent.locationX, e.nativeEvent.locationY),
     }),
   ).current;
 
-  function updateSpin(locationY: number) {
+  function updateTipOffset(locationX: number, locationY: number) {
     const s = sizeRef.current;
-    if (s.radius === 0) return;
-    const offsetY = locationY - s.radius;
-    const clamped = Math.max(-s.innerRadius, Math.min(s.innerRadius, offsetY));
-    const value = -(clamped / s.innerRadius);
-    callbackRef.current(value);
+    if (s.radius === 0 || s.innerRadius === 0) return;
+    let offsetX = locationX - s.radius;
+    let offsetY = locationY - s.radius;
+
+    // Clamp the combined offset to the inner circle (the tip-offset/miscue limit is on
+    // the combined magnitude, not each axis independently — see cueStrike).
+    const dist = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+    if (dist > s.innerRadius) {
+      const scale = s.innerRadius / dist;
+      offsetX *= scale;
+      offsetY *= scale;
+    }
+
+    const newSpin = -(offsetY / s.innerRadius);
+    const newSidespin = offsetX / s.innerRadius;
+    callbackRef.current(newSpin, newSidespin);
   }
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -49,6 +62,7 @@ export default function CueBallControl({ spin, onSpinChange, disabled }: CueBall
     setSize(s);
   };
 
+  const dotOffsetX = sidespin * innerRadius;
   const dotOffsetY = -spin * innerRadius;
 
   return (
@@ -85,7 +99,7 @@ export default function CueBallControl({ spin, onSpinChange, disabled }: CueBall
               borderRadius: dotSize / 2,
               backgroundColor: "rgb(200, 50, 50)",
               top: radius - BORDER + dotOffsetY - dotSize / 2,
-              left: radius - BORDER - dotSize / 2,
+              left: radius - BORDER + dotOffsetX - dotSize / 2,
             }}
           />
         </View>

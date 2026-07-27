@@ -27,6 +27,7 @@ export interface ShotSnapshot {
   /** The shot parameters that were used (for replay) */
   power: number;
   cueSpin: number;
+  cueSidespin: number;
   targetBallIndex: number | null;
   aimDirection: Vec2 | null;
   aimAngleOffset: number;
@@ -36,6 +37,7 @@ export interface InternalState {
   mode: Mode;
   initialBalls: BallState[];
   cueSpin: number;
+  cueSidespin: number;
   power: number;
   targetBallIndex: number | null;
   aimDirection: Vec2 | null;
@@ -70,7 +72,7 @@ export type Action =
   | { type: "AIM_AT_POINT"; point: Vec2 }
   | { type: "ADJUST_ANGLE"; delta: number }
   | { type: "SET_POWER"; power: number }
-  | { type: "SET_SPIN"; spin: number }
+  | { type: "SET_TIP_OFFSET"; spin: number; sidespin: number }
   | { type: "SHOOT" }
   | { type: "TICK" }
   | { type: "RESET" }
@@ -80,14 +82,18 @@ export type Action =
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-export function extractCueParams(cueBall: BallState): { speed: number; spin: number } {
+export function extractCueParams(cueBall: BallState): { speed: number; spin: number; sidespin: number } {
   const speed = norm(cueBall.vel);
-  if (speed === 0) return { speed, spin: 0 };
+  if (speed === 0) return { speed, spin: 0, sidespin: 0 };
   // Invert cueStrike's omega = rotate90(dir) * spin * MAX_CUE_SPIN * speed by projecting
-  // omega back onto rotate90(dir).
+  // omega back onto rotate90(dir). spinZ = sidespin * MAX_CUE_SPIN * speed inverts directly.
   const dir = normalize(cueBall.vel);
   const spinComponent = dot(cueBall.omega, rotate90(dir));
-  return { speed, spin: spinComponent / (MAX_CUE_SPIN * speed) };
+  return {
+    speed,
+    spin: spinComponent / (MAX_CUE_SPIN * speed),
+    sidespin: cueBall.spinZ / (MAX_CUE_SPIN * speed),
+  };
 }
 
 export function buildAimedBalls(state: InternalState): BallState[] {
@@ -117,7 +123,7 @@ export function buildAimedBalls(state: InternalState): BallState[] {
     dir[0] * sin + dir[1] * cos,
   ];
 
-  const newCue = cueStrike(cueBall.pos, rotated, state.power, state.cueSpin);
+  const newCue = cueStrike(cueBall.pos, rotated, state.power, state.cueSpin, state.cueSidespin);
   return [newCue, ...state.initialBalls.slice(1)];
 }
 
@@ -171,6 +177,7 @@ function executeShot(snapshot: ShotSnapshot): {
     rules: snapshot.rules,
     power: snapshot.power,
     cueSpin: snapshot.cueSpin,
+    cueSidespin: snapshot.cueSidespin,
     targetBallIndex: snapshot.targetBallIndex,
     aimDirection: snapshot.aimDirection,
     aimAngleOffset: snapshot.aimAngleOffset,
@@ -191,6 +198,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
           mode: "placing",
           initialBalls: action.balls,
           cueSpin: 0,
+          cueSidespin: 0,
           power: 2.5,
           targetBallIndex: null,
           aimDirection: null,
@@ -210,13 +218,14 @@ export function reducer(state: InternalState, action: Action): InternalState {
           replayQueue: null,
         };
       }
-      const { speed, spin } = extractCueParams(action.balls[0]);
+      const { speed, spin, sidespin } = extractCueParams(action.balls[0]);
       const { frames } = recordSimulation(action.balls, STANDARD_9_FOOT);
       const trajectories = recordTrajectories(action.balls, STANDARD_9_FOOT);
       return {
         mode: "preview",
         initialBalls: action.balls,
         cueSpin: spin,
+        cueSidespin: sidespin,
         power: speed,
         targetBallIndex: null,
         aimDirection: null,
@@ -323,12 +332,21 @@ export function reducer(state: InternalState, action: Action): InternalState {
       return recomputeSimulation({ ...base, power });
     }
 
-    case "SET_SPIN": {
-      const cueSpin = Math.max(-1, Math.min(1, action.spin));
+    case "SET_TIP_OFFSET": {
+      // Clamp the combined (spin, sidespin) vector to the unit disk — not each axis
+      // independently — since both come from a single tip-offset point and cueStrike
+      // rejects any combination past the miscue limit (spin² + sidespin² > 1).
+      let { spin, sidespin } = action;
+      const magSq = spin * spin + sidespin * sidespin;
+      if (magSq > 1) {
+        const mag = Math.sqrt(magSq);
+        spin /= mag;
+        sidespin /= mag;
+      }
       let base = state;
       if (state.mode === "done") base = previewFromFinalPositions(state);
       if (base.mode !== "preview") return state;
-      return recomputeSimulation({ ...base, cueSpin });
+      return recomputeSimulation({ ...base, cueSpin: spin, cueSidespin: sidespin });
     }
 
     case "SHOOT": {
@@ -346,6 +364,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
         rules: base.rules,
         power: base.power,
         cueSpin: base.cueSpin,
+        cueSidespin: base.cueSidespin,
         targetBallIndex: base.targetBallIndex,
         aimDirection: base.aimDirection,
         aimAngleOffset: base.aimAngleOffset,
@@ -428,6 +447,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
             initialBalls: nextShot.initialBalls,
             power: nextShot.power,
             cueSpin: nextShot.cueSpin,
+            cueSidespin: nextShot.cueSidespin,
             targetBallIndex: nextShot.targetBallIndex,
             aimDirection: nextShot.aimDirection,
             aimAngleOffset: nextShot.aimAngleOffset,
@@ -459,6 +479,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
         rules: state.rules,
         power: state.power,
         cueSpin: state.cueSpin,
+        cueSidespin: state.cueSidespin,
         targetBallIndex: state.targetBallIndex,
         aimDirection: state.aimDirection,
         aimAngleOffset: state.aimAngleOffset,
@@ -470,6 +491,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
         rules: snapshot.rules,
         power: snapshot.power,
         cueSpin: snapshot.cueSpin,
+        cueSidespin: snapshot.cueSidespin,
         targetBallIndex: snapshot.targetBallIndex,
         aimDirection: snapshot.aimDirection,
         aimAngleOffset: snapshot.aimAngleOffset,
@@ -493,6 +515,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
         rules: tip.rules,
         power: tip.power,
         cueSpin: tip.cueSpin,
+        cueSidespin: tip.cueSidespin,
         targetBallIndex: tip.targetBallIndex,
         aimDirection: tip.aimDirection,
         aimAngleOffset: tip.aimAngleOffset,
@@ -518,6 +541,7 @@ export function reducer(state: InternalState, action: Action): InternalState {
         rules: first.rules,
         power: first.power,
         cueSpin: first.cueSpin,
+        cueSidespin: first.cueSidespin,
         targetBallIndex: first.targetBallIndex,
         aimDirection: first.aimDirection,
         aimAngleOffset: first.aimAngleOffset,
@@ -537,6 +561,7 @@ export const INITIAL_STATE: InternalState = {
   mode: "preview",
   initialBalls: [],
   cueSpin: 0,
+  cueSidespin: 0,
   power: 2.5,
   targetBallIndex: null,
   aimDirection: null,

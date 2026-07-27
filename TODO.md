@@ -25,12 +25,22 @@ they'd change existing behavior — the deferred items from that fix's planning 
 
 ## Bigger gaps (not touched by that fix)
 
-- [ ] **No sidespin/English.** `cueStrike` only has a follow/draw parameter — no rotation about
-      the vertical axis. Blocks: swerve on cloth, english carrying through rail rebounds, and
-      cut-/spin-induced **throw** at ball-ball contact (today's collision is a purely elastic
-      normal impulse with no tangential friction during contact). This is the natural next step
-      after the curving fix, since it needs a third spin component beyond the horizontal
-      (topspin/backspin) `omega` vector introduced there.
+- [x] **No sidespin/English.** `BallState` now carries a third spin component, `spinZ`
+      (vertical-axis angular velocity), alongside the existing horizontal-plane `omega`.
+      `cueStrike` takes a new `sidespin` parameter (mirroring `spin`, bounds-checked together
+      against the same tip-offset/miscue limit). `spinZ` doesn't interact with cloth friction
+      (a flat-table point-contact model has no lever arm for it there — only omega does), but
+      `resolveBallCollision` now applies a small Coulomb-friction tangential impulse at
+      ball-ball contact driven by the two balls' combined `spinZ`, which "throws" a cut ball
+      off the pure tangent line — deliberately spin-only, not cut-angle-driven, so a spinless
+      cut/stun shot still lands exactly on the tangent line as tested elsewhere. Also threaded
+      `cueSidespin` through the game reducer's aim/shoot/undo/replay state (mirroring `cueSpin`)
+      and fixed a real bug in `recorder.ts` where its deep-copy silently dropped `spinZ`. Rail
+      spin-transfer and cue-tip squirt remain separate follow-up items below. Covered by new
+      tests in `motion-models.test.ts`, `event-resolution.test.ts`, `recorder.test.ts`, and
+      `game-reducer.test.ts`; playable via the "Throw Off Line" debug scenario (same thin cut
+      and speed as a spinless shot, but heavy english visibly sends the object ball to a
+      different spot on the far rail).
 - [ ] **No squirt/deflection from cue tip offset.** Off-center hits for english should deflect
       the cue ball's initial direction slightly from where the cue was aimed; `cueStrike` takes
       direction and spin as independent, already-resolved inputs.

@@ -155,6 +155,19 @@ export const DEBUG_SCENARIOS: Scenario[] = [
       obj([objX, CY], 1),
     ];
   }),
+  scenario("throw_off_line", () => {
+    // Sidespin (english) on the cue ball gives the ball-ball contact point a tangential
+    // slip, which kinetic friction opposes during the collision — this "throws" the cut
+    // ball off the pure geometric tangent line. Same thin cut, same speed, as a spinless
+    // shot would use — only the english differs. See resolveBallCollision in
+    // engine/physics/event-resolution.ts.
+    const cueX = 0.4;
+    const objX = 1.2;
+    return [
+      cueStrike([cueX, CY], [1, 0], 2.5, 0, 1.0),
+      obj([objX, CY + 0.01], 1),
+    ];
+  }),
   scenario("two_ball", () => [
     cueStrike([CUE_X, CY], [1, 0], 2.5),
     obj([OBJ_X, CY], 1),

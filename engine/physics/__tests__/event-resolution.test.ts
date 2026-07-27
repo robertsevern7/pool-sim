@@ -4,7 +4,7 @@ import { resolveEvent } from "../event-resolution";
 import type { Event } from "../event-prediction";
 import { slidingMotion } from "../motion-models";
 import { SimulationState } from "../simulation-state";
-import { cross, dot, norm, rotate90, sub, scale, add } from "../vec2";
+import { cross, dot, norm, normalize, rotate90, sub, scale, add } from "../vec2";
 
 function q3(n: number): string {
   return n.toFixed(3);
@@ -176,6 +176,93 @@ test("resolve ball collision momentum conserved", () => {
   const pAfter = add(scale(a.vel, a.mass), scale(b.vel, b.mass));
   expect(q3(pAfter[0])).toBe(q3(pBefore[0]));
   expect(q3(pAfter[1])).toBe(q3(pBefore[1]));
+});
+
+// ── resolve_ball_collision: throw (sidespin) ──
+//
+// Regression coverage for adding sidespin/English: ball-ball contact now has a small
+// tangential friction impulse driven by spinZ (vertical-axis spin), which "throws" a cut
+// ball off the pure geometric/tangent line. Deliberately spin-only — a spinless cut shot
+// must still land exactly on the tangent line (see the "stun/follow/draw" tests above),
+// so cut angle alone must never trigger this on its own.
+
+test("resolve ball collision no sidespin has zero throw (regression)", () => {
+  const r = BALL_RADIUS;
+  const s2 = Math.sqrt(2);
+  const a = new BallState([0.0, 0.0], [3.0, 0.0], [0, 0], MotionState.SLIDING);
+  const b = new BallState([r * s2, r * s2] as [number, number], [0.0, 0.0], [0, 0], MotionState.STOPPED);
+  resolveBallCollision(a, b);
+  // Exactly the pure tangent-line split, unaffected by the throw mechanism.
+  expect(q3(a.vel[0])).toBe("1.500");
+  expect(q3(a.vel[1])).toBe("-1.500");
+  expect(q3(b.vel[0])).toBe("1.500");
+  expect(q3(b.vel[1])).toBe("1.500");
+});
+
+test("resolve ball collision with cue-ball sidespin throws the cut ball off the tangent line", () => {
+  const r = BALL_RADIUS;
+  const s2 = Math.sqrt(2);
+  const a = new BallState([0.0, 0.0], [3.0, 0.0], [0, 0], MotionState.SLIDING, 0, 60);
+  const b = new BallState([r * s2, r * s2] as [number, number], [0.0, 0.0], [0, 0], MotionState.STOPPED);
+  resolveBallCollision(a, b);
+
+  // Hand-derived reference values for this exact setup (see PR/commit notes) — cross-checked
+  // below against momentum conservation and slip-reduction, not just copied from the code.
+  expect(q3(a.vel[0])).toBe("1.575");
+  expect(q3(a.vel[1])).toBe("-1.575");
+  expect(q3(b.vel[0])).toBe("1.425");
+  expect(q3(b.vel[1])).toBe("1.575");
+  expect(q3(a.spinZ)).toBe("50.720");
+  expect(q3(b.spinZ)).toBe("-9.280");
+});
+
+test("resolve ball collision throw conserves momentum", () => {
+  const r = BALL_RADIUS;
+  const s2 = Math.sqrt(2);
+  const a = new BallState([0.0, 0.0], [3.0, 1.0], [0, 0], MotionState.SLIDING, 0, -40);
+  const b = new BallState([r * s2, 0.0] as [number, number], [-0.5, 0.2], [0, 0], MotionState.SLIDING, 1, 15);
+  const pBefore = add(scale(a.vel, a.mass), scale(b.vel, b.mass));
+  resolveBallCollision(a, b);
+  const pAfter = add(scale(a.vel, a.mass), scale(b.vel, b.mass));
+  expect(q3(pAfter[0])).toBe(q3(pBefore[0]));
+  expect(q3(pAfter[1])).toBe(q3(pBefore[1]));
+});
+
+test("resolve ball collision throw reduces spin-driven slip (friction opposes it, doesn't reverse or amplify it)", () => {
+  const r = BALL_RADIUS;
+  const s2 = Math.sqrt(2);
+  const spinZBefore = { a: 60, b: -10 };
+  const slipBefore = -BALL_RADIUS * (spinZBefore.a + spinZBefore.b);
+
+  const a = new BallState([0.0, 0.0], [3.0, 0.0], [0, 0], MotionState.SLIDING, 0, spinZBefore.a);
+  const b = new BallState([r * s2, r * s2] as [number, number], [0.0, 0.0], [0, 0], MotionState.STOPPED, 1, spinZBefore.b);
+  resolveBallCollision(a, b);
+
+  const slipAfter = -BALL_RADIUS * (a.spinZ + b.spinZ);
+  expect(Math.sign(slipAfter)).toBe(Math.sign(slipBefore));
+  expect(Math.abs(slipAfter)).toBeLessThan(Math.abs(slipBefore));
+});
+
+test("resolve ball collision throw direction flips with sidespin direction", () => {
+  // Kinetic (Coulomb) friction is bounded by BALL_FRICTION * normal impulse regardless of
+  // *how much* slip there is — only the slip's sign picks which way the throw deflects.
+  const r = BALL_RADIUS;
+  const s2 = Math.sqrt(2);
+
+  function throwDeflectionAlongTangent(spinZ: number): number {
+    const a = new BallState([0.0, 0.0], [3.0, 0.0], [0, 0], MotionState.SLIDING, 0, spinZ);
+    const b = new BallState([r * s2, r * s2] as [number, number], [0.0, 0.0], [0, 0], MotionState.STOPPED);
+    resolveBallCollision(a, b);
+    const nHat = normalize(sub([0.0, 0.0] as [number, number], [r * s2, r * s2] as [number, number]));
+    const tangentDir = rotate90(nHat);
+    return dot(b.vel, tangentDir);
+  }
+
+  const positive = throwDeflectionAlongTangent(60);
+  const negative = throwDeflectionAlongTangent(-60);
+  expect(positive).not.toBeCloseTo(0, 6);
+  expect(Math.sign(positive)).toBe(-Math.sign(negative));
+  expect(q3(Math.abs(positive))).toBe(q3(Math.abs(negative)));
 });
 
 // ── resolve_rail_collision: base cases ──

@@ -15,6 +15,12 @@ export class BallState {
   vel: [number, number];
   /** Horizontal-plane angular velocity vector (spin axis), independent of vel's direction. */
   omega: Vec2;
+  /**
+   * Vertical-axis angular velocity (sidespin/English), rad/s. Independent of `omega`: a
+   * ball resting flat on the table can carry topspin/backspin (omega) and sidespin (spinZ)
+   * at the same time — they only interact at ball-ball and rail contact, not on the cloth.
+   */
+  spinZ: number;
   motion: MotionState;
   /** Ball identity: 0 = cue, 1–15 = object balls */
   number: number;
@@ -25,12 +31,14 @@ export class BallState {
     omega: Vec2,
     motion: MotionState,
     ballNumber: number = 0,
+    spinZ: number = 0,
   ) {
     this.pos = [pos[0], pos[1]];
     this.vel = [vel[0], vel[1]];
     this.omega = [omega[0], omega[1]];
     this.motion = motion;
     this.number = ballNumber;
+    this.spinZ = spinZ;
   }
 
   get radius() {

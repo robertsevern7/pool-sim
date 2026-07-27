@@ -1,7 +1,14 @@
 import { BallState, MotionState } from "../physics/ball-state";
 import { BALL_RADIUS, STANDARD_9_FOOT } from "../physics/constants";
 import { cueStrike } from "../physics/motion-models";
-import { reducer, INITIAL_STATE, type InternalState, type Action } from "../game-reducer";
+import {
+  reducer,
+  INITIAL_STATE,
+  extractCueParams,
+  buildAimedBalls,
+  type InternalState,
+  type Action,
+} from "../game-reducer";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -227,5 +234,70 @@ describe("LOAD_SCENARIO resets history", () => {
     expect(fresh.latestBalls).toHaveLength(0);
     expect(fresh.tipSnapshot).toBeNull();
     expect(fresh.shotsTaken).toBe(0);
+  });
+});
+
+describe("sidespin (english) round-trips through the reducer", () => {
+  test("extractCueParams recovers sidespin from a cueStrike ball", () => {
+    const cue = cueStrike([CUE_X, CY], [1, 0], 3.0, 0, 0.6);
+    const { sidespin } = extractCueParams(cue);
+    expect(sidespin).toBeCloseTo(0.6, 6);
+  });
+
+  test("LOAD_SCENARIO extracts cueSidespin from the scenario's cue ball", () => {
+    const balls = [
+      cueStrike([CUE_X, CY], [1, 0], 3.0, 0, 0.6),
+      new BallState([OBJ_X, CY], [0, 0], [0, 0], MotionState.STOPPED, 1),
+    ];
+    const s = loadScenario(balls);
+    expect(s.cueSidespin).toBeCloseTo(0.6, 6);
+  });
+
+  test("buildAimedBalls carries cueSidespin into the re-aimed cue ball", () => {
+    const s = loadScenario(makeTwoBallScenario());
+    const withSidespin: InternalState = { ...s, cueSidespin: 0.7 };
+    const aimed = buildAimedBalls(withSidespin);
+    expect(aimed[0].spinZ).not.toBe(0);
+  });
+
+  test("a scenario shot with sidespin throws the object ball off the no-sidespin outcome", () => {
+    // End-to-end regression: LOAD_SCENARIO -> SHOOT must not silently drop sidespin anywhere
+    // along the way (a real bug found in recorder.ts's internal deep copy).
+    const cutBalls = (sidespin: number): BallState[] => [
+      cueStrike([CUE_X, CY], [1, 0], 3.0, 0, sidespin),
+      new BallState([OBJ_X, CY + 0.02], [0, 0], [0, 0], MotionState.STOPPED, 1),
+    ];
+
+    const thrown = shootOnce(cutBalls(0.8));
+    const straight = shootOnce(cutBalls(0));
+
+    const thrownObj = thrown.latestBalls.find((b) => b.number === 1)!;
+    const straightObj = straight.latestBalls.find((b) => b.number === 1)!;
+    expect(thrownObj.pos[0]).not.toBeCloseTo(straightObj.pos[0], 4);
+  });
+
+  // Regression: SET_SPIN used to only touch cueSpin, leaving a scenario-loaded cueSidespin
+  // untouched. Adjusting vertical spin (e.g. dragging the cue ball control) after loading a
+  // scenario with heavy english would then push spin²+sidespin² past 1 and crash cueStrike's
+  // miscue check. SET_TIP_OFFSET must clamp the combined vector instead of throwing.
+  test("SET_TIP_OFFSET does not crash when combined with an existing max sidespin", () => {
+    const balls = [
+      cueStrike([CUE_X, CY], [1, 0], 3.0, 0, 1.0), // scenario loaded with max sidespin
+      new BallState([OBJ_X, CY], [0, 0], [0, 0], MotionState.STOPPED, 1),
+    ];
+    const s = loadScenario(balls);
+    expect(s.cueSidespin).toBeCloseTo(1.0, 6);
+
+    expect(() =>
+      reducer(s, { type: "SET_TIP_OFFSET", spin: 0.5, sidespin: s.cueSidespin }),
+    ).not.toThrow();
+  });
+
+  test("SET_TIP_OFFSET clamps the combined vector to the unit disk rather than each axis independently", () => {
+    const s = loadScenario(makeTwoBallScenario());
+    const next = reducer(s, { type: "SET_TIP_OFFSET", spin: 0.9, sidespin: 0.9 });
+    expect(next.cueSpin * next.cueSpin + next.cueSidespin * next.cueSidespin).toBeLessThanOrEqual(1 + 1e-9);
+    // Direction (ratio between the two) should be preserved by the clamp.
+    expect(next.cueSpin).toBeCloseTo(next.cueSidespin, 6);
   });
 });

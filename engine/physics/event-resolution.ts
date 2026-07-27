@@ -1,10 +1,15 @@
 import { BallState, MotionState } from "./ball-state";
-import { BALL_RADIUS, RAIL_RESTITUTION, Table } from "./constants";
+import { BALL_FRICTION, BALL_RADIUS, RAIL_RESTITUTION, Table } from "./constants";
 import type { Event } from "./event-prediction";
 import type { SimulationState } from "./simulation-state";
-import { sub, dot, scale, norm, add, Vec2 } from "./vec2";
+import { sub, dot, scale, norm, add, rotate90, Vec2 } from "./vec2";
 
 const CONTACT_THRESHOLD = BALL_RADIUS * 2 + 1e-4;
+
+// Solid-sphere moment of inertia about its own center: I = (2/5) m R².
+function momentOfInertia(mass: number): number {
+  return (2 / 5) * mass * BALL_RADIUS * BALL_RADIUS;
+}
 
 function resolveBallCollision(a: BallState, b: BallState): void {
   const n = sub(a.pos, b.pos);
@@ -19,9 +24,34 @@ function resolveBallCollision(a: BallState, b: BallState): void {
   if (velNorm > 0) return;
 
   const impulse = (-2 * velNorm) / (a.mass + b.mass);
+  const normalImpulse = impulse * a.mass * b.mass;
 
   a.vel = add(a.vel, scale(nHat, impulse * b.mass));
   b.vel = sub(b.vel, scale(nHat, impulse * a.mass));
+
+  // Throw: sidespin (spinZ) gives the contact point a tangential slip velocity — the
+  // horizontal-plane omega used for cloth contact only contributes a *vertical* velocity
+  // here (the table's normal force absorbs that; we don't model it), so only spinZ matters.
+  // Deliberately spin-only, not cut-angle-tangential-velocity-based: this engine already
+  // treats a spinless cut/stun shot as following the exact geometric tangent line elsewhere
+  // (see event-resolution.test.ts), so cut-angle-alone contributes no slip here — only
+  // english does. Kinetic friction opposes that slip, bounded by BALL_FRICTION * the normal
+  // impulse just applied. This is what deflects a cut ball (and the cue ball) off the pure
+  // tangent line when the cue ball carries english.
+  const tangentDir = rotate90(nHat);
+  const relSlipTangential = -BALL_RADIUS * (a.spinZ + b.spinZ);
+
+  if (Math.abs(relSlipTangential) > 1e-9) {
+    const tangentImpulse = -Math.sign(relSlipTangential) * BALL_FRICTION * normalImpulse;
+
+    a.vel = add(a.vel, scale(tangentDir, tangentImpulse / a.mass));
+    b.vel = sub(b.vel, scale(tangentDir, tangentImpulse / b.mass));
+
+    // Equal and opposite torque (about each ball's own center, lever arm = radius) on both
+    // balls — friction acts at the same physical point, R away from each ball's own center.
+    a.spinZ += (-BALL_RADIUS * tangentImpulse) / momentOfInertia(a.mass);
+    b.spinZ += (-BALL_RADIUS * tangentImpulse) / momentOfInertia(b.mass);
+  }
 
   const pairs: [BallState, Vec2][] = [
     [a, scale(nHat, -1)],
@@ -30,10 +60,10 @@ function resolveBallCollision(a: BallState, b: BallState): void {
 
   for (const [ball, spinDir] of pairs) {
     const speed = norm(ball.vel);
-    if (speed < 1e-9 && norm(ball.omega) < 1e-9) {
+    if (speed < 1e-9 && norm(ball.omega) < 1e-9 && Math.abs(ball.spinZ) < 1e-9) {
       ball.vel = [0, 0];
       ball.motion = MotionState.STOPPED;
-    } else if (speed < 1e-9 && norm(ball.omega) > 1e-9) {
+    } else if (speed < 1e-9 && (norm(ball.omega) > 1e-9 || Math.abs(ball.spinZ) > 1e-9)) {
       ball.vel = scale(spinDir, 1e-6);
       ball.motion = MotionState.SLIDING;
     } else {

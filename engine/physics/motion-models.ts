@@ -30,6 +30,7 @@ export function cueStrike(
   direction: Vec2,
   speed: number,
   spin: number = 0.0,
+  sidespin: number = 0.0,
 ): BallState {
   if (speed === 0) {
     return new BallState(position, [0, 0], [0, 0], MotionState.STOPPED);
@@ -42,12 +43,23 @@ export function cueStrike(
   if (spin < -1 || spin > 1) {
     throw new Error("spin must be between -1 (max draw) and 1 (max follow)");
   }
+  if (sidespin < -1 || sidespin > 1) {
+    throw new Error("sidespin must be between -1 (max left english) and 1 (max right english)");
+  }
+  // Both spin and sidespin come from a single tip offset point (bounded by radius/2 before
+  // a miscue) — same derivation as MAX_CUE_SPIN, just resolved into two axes instead of one.
+  // Small epsilon so a caller that normalizes to exactly the unit circle isn't tripped up by
+  // floating-point rounding landing a hair past 1.
+  if (spin * spin + sidespin * sidespin > 1 + 1e-9) {
+    throw new Error("combined spin and sidespin exceed the tip offset that avoids a miscue");
+  }
 
   const dir = normalize(direction);
   const vel: Vec2 = scale(dir, speed);
   const omega = scale(rotate90(dir), spin * MAX_CUE_SPIN * speed);
+  const spinZ = sidespin * MAX_CUE_SPIN * speed;
 
-  return new BallState(position, vel, omega, MotionState.SLIDING);
+  return new BallState(position, vel, omega, MotionState.SLIDING, 0, spinZ);
 }
 
 export function slidingMotion(

@@ -15,6 +15,10 @@ export const MU_ROLL = 0.03;
 // rail restitution
 export const RAIL_RESTITUTION = 0.82;
 
+// Ball-to-ball Coulomb friction coefficient — small but nonzero, responsible for "throw"
+// (a cut ball gets deflected slightly off the true line by cue-ball sidespin/english).
+export const BALL_FRICTION = 0.05;
+
 export const BALL_RADIUS = 0.028575; // meters
 export const BALL_MASS = 0.17;
 
