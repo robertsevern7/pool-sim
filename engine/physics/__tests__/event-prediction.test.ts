@@ -5,7 +5,6 @@ import {
   predictRailCollision,
   predictStateTransition,
   computeNextEvent,
-  linePocketIntersection,
   isInPocketGap,
 } from "../event-prediction";
 import { cueStrike, slidingMotion } from "../motion-models";
@@ -265,133 +264,44 @@ test("ball rolling along rail near pocket does not bounce off rail in pocket zon
   expect(event!.eventType).toBe("POCKET");
 });
 
-// ── linePocketIntersection ──
+// ── pocket entry: curved (sliding) trajectory ──
+//
+// Regression coverage for the fix to predictPocketEntry: it used to ray-cast in a
+// straight line along the ball's current velocity direction, which ignores the curving a
+// sliding ball undergoes when its spin isn't aligned with vel (see slidingMotion in
+// motion-models.ts, and ballAcceleration's slip-velocity direction). These tests set up a
+// ball whose velocity alone (a straight line at constant y) would pass just outside a
+// corner pocket's fall circle, but whose spin curves it inward until it actually crosses
+// the circle — the case a straight-line ray cast gets wrong.
 
-test("linePocketIntersection returns point on the fall radius circle", () => {
-  const pockets = getPockets(TABLE);
+test("spinning slide curves into a pocket a straight-line prediction would miss", () => {
+  const pocket = getPockets(TABLE)[1]; // top-right corner
+  const ball = new BallState([TABLE.width - 0.5, 0.1], [2, 0], [60, 0], MotionState.SLIDING);
+  const state = new SimulationState([ball], 0.0);
 
-  // Side pocket at (w/2, -arcSetback) with fallRadius = sideCr
-  const sidePocket = pockets[4]; // first side pocket
+  const event = computeNextEvent(state, TABLE);
+  expect(event).not.toBeNull();
+  expect(event!.eventType).toBe("POCKET");
+  expect(event!.b).toBe(1);
 
-  // Ball heading straight toward the side pocket
-  const ballPos: [number, number] = [TABLE.width / 2, 0.5];
-  const dir: [number, number] = [0, -1];
-
-  const hit = linePocketIntersection(ballPos, dir, sidePocket);
-  expect(hit).not.toBeNull();
-
-  // Verify the hit point lies on the fall radius circle
-  const dx = hit![0] - sidePocket.fallCenter[0];
-  const dy = hit![1] - sidePocket.fallCenter[1];
+  // Self-consistency: the ball's actual position at the predicted time (via the same
+  // constant-acceleration sliding motion the simulator advances by) sits on the fall circle.
+  const { pos } = slidingMotion(ball, event!.time - state.time, G);
+  const dx = pos[0] - pocket.fallCenter[0];
+  const dy = pos[1] - pocket.fallCenter[1];
   const dist = Math.sqrt(dx * dx + dy * dy);
-  expect(dist).toBeCloseTo(sidePocket.fallRadius, 6);
+  expect(q3(dist)).toBe(q3(pocket.fallRadius));
 });
 
-test("linePocketIntersection returns point closest to cloth", () => {
-  const pockets = getPockets(TABLE);
-  const sidePocket = pockets[4];
+test("same shot without spin does not pocket — travels in a straight line and misses", () => {
+  // Same position/velocity as above, but zero spin: vel alone points straight along y=0.1,
+  // which stays outside the corner pocket's fall circle (offset 0.1635 > radius 0.1143).
+  const ball = new BallState([TABLE.width - 0.5, 0.1], [2, 0], [0, 0], MotionState.SLIDING);
+  const state = new SimulationState([ball], 0.0);
 
-  const ballPos: [number, number] = [TABLE.width / 2, 0.5];
-  const dir: [number, number] = [0, -1];
-
-  const hit = linePocketIntersection(ballPos, dir, sidePocket);
-  expect(hit).not.toBeNull();
-
-  // The entry point is behind the rail (y < 0) where the rendered cloth arc is
-  // It should be closer to y=0 than the fall center (i.e., the near side of the circle)
-  expect(hit![1]).toBeGreaterThan(sidePocket.fallCenter[1]);
-});
-
-test("linePocketIntersection corner pocket returns point on fall circle", () => {
-  const pockets = getPockets(TABLE);
-  const cornerPocket = pockets[1]; // top-right corner at (w, 0)
-
-  // Ball heading toward the corner
-  const ballPos: [number, number] = [TABLE.width - 0.3, 0.3];
-  const dir: [number, number] = [1 / Math.SQRT2, -1 / Math.SQRT2];
-
-  const hit = linePocketIntersection(ballPos, dir, cornerPocket);
-  expect(hit).not.toBeNull();
-
-  const dx = hit![0] - cornerPocket.fallCenter[0];
-  const dy = hit![1] - cornerPocket.fallCenter[1];
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  expect(dist).toBeCloseTo(cornerPocket.fallRadius, 6);
-});
-
-test("linePocketIntersection returns null when ray misses pocket", () => {
-  const pockets = getPockets(TABLE);
-  const sidePocket = pockets[4];
-
-  // Ball heading parallel to the rail, not toward the pocket
-  const ballPos: [number, number] = [0.5, 0.5];
-  const dir: [number, number] = [1, 0];
-
-  const hit = linePocketIntersection(ballPos, dir, sidePocket);
-  expect(hit).toBeNull();
-});
-
-// Basic line-circle intersection tests with simple geometry
-describe("linePocketIntersection basic geometry", () => {
-  const unitCircle = { type: "side" as const, center: [0, 0] as [number, number], fallCenter: [0, 0] as [number, number], fallRadius: 1, zoneRadius: 2, mouthWidth: 1, backRadius: 0.5 };
-
-  test("ray along +x axis hits unit circle entry at (-1, 0)", () => {
-    const hit = linePocketIntersection([-5, 0], [1, 0], unitCircle);
-    expect(hit).not.toBeNull();
-    expect(hit![0]).toBeCloseTo(-1, 10);
-    expect(hit![1]).toBeCloseTo(0, 10);
-  });
-
-  test("ray along -x axis hits unit circle entry at (1, 0)", () => {
-    const hit = linePocketIntersection([5, 0], [-1, 0], unitCircle);
-    expect(hit).not.toBeNull();
-    expect(hit![0]).toBeCloseTo(1, 10);
-    expect(hit![1]).toBeCloseTo(0, 10);
-  });
-
-  test("ray along +y axis hits unit circle entry at (0, -1)", () => {
-    const hit = linePocketIntersection([0, -5], [0, 1], unitCircle);
-    expect(hit).not.toBeNull();
-    expect(hit![0]).toBeCloseTo(0, 10);
-    expect(hit![1]).toBeCloseTo(-1, 10);
-  });
-
-  test("ray along -y axis hits unit circle entry at (0, 1)", () => {
-    const hit = linePocketIntersection([0, 5], [0, -1], unitCircle);
-    expect(hit).not.toBeNull();
-    expect(hit![0]).toBeCloseTo(0, 10);
-    expect(hit![1]).toBeCloseTo(1, 10);
-  });
-
-  test("ray that misses returns null", () => {
-    const hit = linePocketIntersection([0, 5], [1, 0], unitCircle);
-    expect(hit).toBeNull();
-  });
-
-  test("ray at 45° hits unit circle entry at (√2/2, √2/2)", () => {
-    const dir = [1 / Math.SQRT2, 1 / Math.SQRT2] as [number, number];
-    const hit = linePocketIntersection([-5, -5], dir, unitCircle);
-    expect(hit).not.toBeNull();
-    expect(hit![0]).toBeCloseTo(-Math.SQRT2 / 2, 10);
-    expect(hit![1]).toBeCloseTo(-Math.SQRT2 / 2, 10);
-  });
-
-  test("ray returns entry point (first hit), not exit", () => {
-    const hit = linePocketIntersection([-5, 0], [1, 0], unitCircle);
-    expect(hit).not.toBeNull();
-    expect(hit![0]).toBeCloseTo(-1, 10);
-    expect(hit![1]).toBeCloseTo(0, 10);
-  });
-
-  test("ball moving away from pocket returns null", () => {
-    const hit = linePocketIntersection([5, 0], [1, 0], unitCircle);
-    expect(hit).toBeNull();
-  });
-
-  test("ray missing pocket returns null", () => {
-    const hit = linePocketIntersection([0, 5], [1, 0], unitCircle);
-    expect(hit).toBeNull();
-  });
+  const event = computeNextEvent(state, TABLE);
+  expect(event).not.toBeNull();
+  expect(event!.eventType).not.toBe("POCKET");
 });
 
 // --- isInPocketGap ---

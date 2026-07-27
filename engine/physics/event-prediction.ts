@@ -7,7 +7,6 @@ import {
   ballAcceleration,
   timeRollingToStop,
   timeSlidingToRolling,
-  timeToTravelDistance,
 } from "./motion-models";
 import { sub, scale, dot, norm, Vec2 } from "./vec2";
 import { solvePolynomial } from "./polynomial";
@@ -190,45 +189,13 @@ export function predictStateTransition(ball: BallState): number | null {
   return null;
 }
 
-// Line-circle intersection: find where the ball's trajectory ray crosses the pocket's fall circle.
-// Returns the intersection point closest to the cloth (playing surface), or null.
-export function linePocketIntersection(
-  ballPos: Vec2,
-  ballDir: Vec2,
-  pocket: Pocket,
-): Vec2 | null {
-  const cx = pocket.fallCenter[0];
-  const cy = pocket.fallCenter[1];
-  const r = pocket.fallRadius;
-
-  // Ray: P(t) = ballPos + ballDir * t, t >= 0
-  const ex = ballPos[0] - cx;
-  const ey = ballPos[1] - cy;
-  const dx = ballDir[0];
-  const dy = ballDir[1];
-
-  const a = dx * dx + dy * dy;
-  const b = 2 * (ex * dx + ey * dy);
-  const c = ex * ex + ey * ey - r * r;
-
-  const disc = b * b - 4 * a * c;
-  if (disc < 0) return null;
-
-  const sqrtDisc = Math.sqrt(disc);
-  const t1 = (-b - sqrtDisc) / (2 * a);
-  const t2 = (-b + sqrtDisc) / (2 * a);
-
-  // Return the first intersection ahead of the ball (smallest positive t = entry point)
-  if (t1 > 1e-6) return [ballPos[0] + dx * t1, ballPos[1] + dy * t1];
-  if (t2 > 1e-6) return [ballPos[0] + dx * t2, ballPos[1] + dy * t2];
-  return null;
-}
-
-// NOTE: assumes the ball travels in a straight line (current velocity direction) to the
-// pocket's fall circle. This is exact once a ball is ROLLING, but only an approximation
-// during SLIDING when the ball is curving off spin picked up in a prior collision (see
-// slidingMotion in motion-models.ts). The error is bounded to the short sliding sub-phase
-// and is treated as an acceptable known limitation rather than solved exactly here.
+// Predicts when the ball's center crosses a pocket's fall circle, using the ball's exact
+// constant-acceleration trajectory within its current motion regime — the same quartic
+// root-finding as predictBallBallCollision, against a fixed point instead of a moving ball.
+// This is exact for both ROLLING (acceleration colinear with vel) and SLIDING (acceleration
+// fixed in the initial slip direction, per slidingMotion in motion-models.ts — the direction
+// doesn't change during a sliding sub-phase, only its magnitude decays), so it correctly
+// follows the curved path a spinning ball takes while sliding, unlike a straight-line ray cast.
 function predictPocketEntry(
   ball: BallState,
   table: Table,
@@ -238,26 +205,48 @@ function predictPocketEntry(
   const speed = norm(ball.vel);
   if (speed < 1e-9) return null;
 
-  const dir: Vec2 = [ball.vel[0] / speed, ball.vel[1] / speed];
+  const a = ballAcceleration(ball, G);
+  const halfA: Vec2 = scale(a, 0.5);
+  const tMax = predictStateTransition(ball) ?? Infinity;
   const pockets = getPockets(table);
+
   let earliest: { time: number; pocketIndex: number } | null = null;
 
   for (let pi = 0; pi < pockets.length; pi++) {
     const pocket = pockets[pi];
-    const hitPoint = linePocketIntersection(ball.pos, dir, pocket);
-    if (hitPoint === null) continue;
+    const r = pocket.fallRadius;
+    const dp = sub(ball.pos, pocket.fallCenter);
 
-    // Distance from ball center to the intersection point on the fall circle
-    const dx = hitPoint[0] - ball.pos[0];
-    const dy = hitPoint[1] - ball.pos[1];
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist <= 0) continue;
+    // |dp + vel*t + halfA*t²| = r
+    const c4 = dot(halfA, halfA);
+    const c3 = 2 * dot(ball.vel, halfA);
+    const c2 = dot(ball.vel, ball.vel) + 2 * dot(dp, halfA);
+    const c1 = 2 * dot(dp, ball.vel);
+    const c0 = dot(dp, dp) - r * r;
 
-    const t = timeToTravelDistance(ball, dist, G);
-    if (t !== null && t > 1e-6) {
-      if (earliest === null || t < earliest.time) {
-        earliest = { time: t, pocketIndex: pi };
+    let coeffs = [c4, c3, c2, c1, c0];
+    while (coeffs.length > 1 && coeffs[0] === 0) {
+      coeffs.shift();
+    }
+    if (coeffs.length <= 1) continue;
+
+    const roots = solvePolynomial(coeffs);
+
+    // Validate: substitute back and check distance ≈ fall radius, same as predictBallBallCollision.
+    let best: number | null = null;
+    for (const t of roots.filter((t) => t > 1e-6 && t <= tMax).sort((x, y) => x - y)) {
+      const sepX = dp[0] + ball.vel[0] * t + halfA[0] * t * t;
+      const sepY = dp[1] + ball.vel[1] * t + halfA[1] * t * t;
+      const dist = Math.sqrt(sepX * sepX + sepY * sepY);
+      if (Math.abs(dist - r) < 1e-4) {
+        best = t;
+        break;
       }
+    }
+    if (best === null) continue;
+
+    if (earliest === null || best < earliest.time) {
+      earliest = { time: best, pocketIndex: pi };
     }
   }
 

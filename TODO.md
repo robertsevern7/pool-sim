@@ -6,11 +6,13 @@ they'd change existing behavior — the deferred items from that fix's planning 
 
 ## Deferred from the curving fix
 
-- [ ] **Pocket-entry prediction still assumes straight-line motion.** `predictPocketEntry` in
-      `engine/physics/event-prediction.ts` casts a straight ray to the pocket's fall circle. Now
-      that sliding balls can curve post-collision, this is an approximation during the sliding
-      sub-phase (bounded error, documented with a comment at the function). Exact fix needs
-      numeric ray-vs-curve root finding.
+- [x] **Pocket-entry prediction still assumes straight-line motion.** `predictPocketEntry` in
+      `engine/physics/event-prediction.ts` now solves the same quartic (ball-vs-fixed-point,
+      constant-acceleration) root finding as `predictBallBallCollision`, instead of casting a
+      straight ray. Exact for both ROLLING and SLIDING (the sliding acceleration direction is
+      fixed for the sub-phase, so this is not an approximation). Covered by new tests in
+      `engine/physics/__tests__/event-prediction.test.ts` and playable via the "Curve Into
+      Pocket" debug scenario.
 - [ ] **A ball with pure spin and zero velocity stays frozen.** `ballAcceleration` and
       `slidingMotion` in `engine/physics/motion-models.ts` return no motion at all when
       `vel = 0`, regardless of `omega`. In reality a ball spinning in place would start to

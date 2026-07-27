@@ -130,6 +130,16 @@ export const DEBUG_SCENARIOS: Scenario[] = [
       obj([objX, objY], 9),
     ];
   }),
+  scenario("curve_into_pocket", () => {
+    // Thin cut with max follow: the cue ball separates onto a tangent line that alone
+    // would slide past the top-right corner, but retains its pre-collision topspin —
+    // now misaligned with the new direction — so it curves the rest of the way in.
+    // See predictPocketEntry in engine/physics/event-prediction.ts.
+    return [
+      cueStrike([2.2, 0.14], [1, 0], 2.5, 1.0),
+      obj([2.7, 0.15], 1),
+    ];
+  }),
   scenario("two_ball", () => [
     cueStrike([CUE_X, CY], [1, 0], 2.5),
     obj([OBJ_X, CY], 1),
