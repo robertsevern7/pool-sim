@@ -166,7 +166,9 @@ export function resolveEvent(
     const ball = state.balls[event.a];
 
     let normal: Vec2;
-    if (ball.pos[0] <= ball.radius) {
+    if (event.normal) {
+      normal = event.normal;
+    } else if (ball.pos[0] <= ball.radius) {
       normal = [1, 0];
     } else if (ball.pos[0] >= table.width - ball.radius) {
       normal = [-1, 0];

@@ -70,13 +70,43 @@ export const POCKET_CONFIG = {
 
 export type PocketType = "corner" | "side";
 
+// Distance, measured along the rail from a pocket's true center, to where the straight
+// cushion ends and the angled jaw nose begins — i.e. the nose's heel. This is the single
+// shared source for that position: components/Cushions.tsx's nose placement and
+// engine/physics/jaw-geometry.ts's collision heel must both derive from this function, not
+// duplicate their own copy of it, so they can never silently drift apart again (see project
+// history — they did, twice, before this was extracted).
+//
+// The two pocket types genuinely use different formulas, reverse-derived by equating this
+// function's output (converted to screen pixels) against Cushions.tsx's original, untouched
+// rendering math, corner by corner:
+//   corner: dTip + ccd - cushionThickness  (the render's "R + cm" turns out to be exactly
+//           "border + dTip + ccd - cushionThickness" once R is rewritten as border - CT)
+//   side:   dTip alone — the render never adds the angled ccd term for the side nose's
+//           straight-cushion boundary (only for the decorative triangle's own leg length)
+// dTip is half the mouth width for a side pocket, or the diagonal mouth width divided by
+// sqrt(2) for a corner pocket (the mouth is measured diagonally across the corner).
+export function heelAlongRail(
+  type: PocketType,
+  mouthWidth: number,
+  cushionThickness: number,
+  angleDeg: number,
+): number {
+  const dTip = type === "corner" ? mouthWidth / Math.SQRT2 : mouthWidth / 2;
+  if (type === "side") return dTip;
+  const ccd = angleDeg >= 90 ? 0 : cushionThickness / Math.tan((angleDeg * Math.PI) / 180);
+  return dTip + ccd - cushionThickness;
+}
+
 export interface Pocket {
   type: PocketType;
   center: [number, number]; // meters — nominal pocket position (corner of table or midpoint of rail)
   fallCenter: [number, number]; // meters — center of the cloth arc circle (used for potting detection)
   fallRadius: number;       // meters — cloth arc circle radius (ball potted when center crosses)
-  zoneRadius: number;       // meters — rail collisions are suppressed within this radius
-  mouthWidth: number;       // meters — distance between nose tips at pocket opening
+  mouthWidth: number;       // meters — input to the jaw-angle construction (see jaw-geometry.ts);
+                            // the actual computed nose-tip-to-nose-tip distance, once each tip
+                            // is snapped onto the fall circle for seamless collision handoff,
+                            // differs slightly from this nominal value
   backRadius: number;       // meters — radius of the back semicircle
 }
 
@@ -98,19 +128,17 @@ export function getPockets(table: Table): Pocket[] {
   // Total offset from playing surface = arcSetback + ct - inset.
   const sideInset = POCKET_CONFIG.sidePocketInset * INCHES_TO_M;
   const sideArcSetback = Math.sqrt(sideCr * sideCr - sideBackR * sideBackR) + ct - sideInset;
-  // zoneRadius must reach from the fall center past y=BALL_RADIUS to suppress rail collisions
-  const sideZone = sideArcSetback + BALL_RADIUS;
 
   // Corner pocket fallCenter is offset diagonally into the rail
   const co = 1.25 * ct; // corner offset from table edge
 
   const corner = (cx: number, cy: number, fcx: number, fcy: number): Pocket => ({
     type: "corner", center: [cx, cy], fallCenter: [fcx, fcy],
-    fallRadius: cornerCr, zoneRadius: cornerCr, mouthWidth: cornerMouth, backRadius: cornerBackR,
+    fallRadius: cornerCr, mouthWidth: cornerMouth, backRadius: cornerBackR,
   });
   const side = (cx: number, cy: number, fcx: number, fcy: number): Pocket => ({
     type: "side", center: [cx, cy], fallCenter: [fcx, fcy],
-    fallRadius: sideCr, zoneRadius: sideZone, mouthWidth: sideMouth, backRadius: sideBackR,
+    fallRadius: sideCr, mouthWidth: sideMouth, backRadius: sideBackR,
   });
 
   return [

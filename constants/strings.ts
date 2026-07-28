@@ -60,6 +60,8 @@ export const strings = {
     pot_side_higher: { name: "Pot Side Higher", description: "Straight shot into side pocket from higher position" },
     pot_side_right: { name: "Pot Side Right", description: "Straight shot into right side pocket" },
     curve_into_pocket: { name: "Curve Into Pocket", description: "Follow-cut curves the cue ball into a corner it would otherwise slide past" },
+    corner_jaw_skim: { name: "Corner Jaw Skim", description: "Shallow-angle shot skims a pocket mouth and bounces off the jaw cushion instead of escaping the table" },
+    straight_down_x15th: { name: "Straight Down (x = w/15)", description: "Ball shot straight down the table near a corner, at x = table width / 15 — checks the rail-vs-jaw boundary" },
     draw_creep: { name: "Draw Creep", description: "Cue ball stops dead on a full hit but draws back afterward from leftover backspin" },
     throw_off_line: { name: "Throw Off Line", description: "Cue-ball sidespin (english) throws the cut ball off the true tangent line" },
     squirt_miss: { name: "Squirt Miss", description: "Uncompensated sidespin squirts the cue ball off a dead-straight aim, missing the object ball entirely" },

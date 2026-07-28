@@ -1,6 +1,8 @@
 import { MotionState } from "./ball-state";
-import { G, BALL_RADIUS, getPockets } from "./constants";
-import type { Table, Pocket } from "./constants";
+import { G, getPockets } from "./constants";
+import type { Table } from "./constants";
+import { getJawSegments, getRailSegments } from "./jaw-geometry";
+import type { CushionSegment } from "./jaw-geometry";
 import type { SimulationState } from "./simulation-state";
 import type { BallState } from "./ball-state";
 import {
@@ -8,7 +10,7 @@ import {
   timeRollingToStop,
   timeSlidingToRolling,
 } from "./motion-models";
-import { sub, scale, dot, Vec2 } from "./vec2";
+import { add, sub, scale, dot, norm, Vec2 } from "./vec2";
 import { solvePolynomial } from "./polynomial";
 
 export interface Event {
@@ -16,6 +18,9 @@ export interface Event {
   eventType: "BALL_COLLISION" | "RAIL_COLLISION" | "STATE_CHANGE" | "POCKET";
   a: number;
   b: number | null;
+  normal?: Vec2; // set on every RAIL_COLLISION computeNextEvent produces (rail or jaw alike —
+                 // both are just CushionSegments); optional only for hand-constructed Events
+                 // (tests) that want resolveEvent's axis-aligned fallback derivation instead.
 }
 
 export function predictBallBallCollision(
@@ -78,105 +83,92 @@ export function predictBallBallCollision(
   return null;
 }
 
-// Check if a rail collision position falls within a pocket mouth gap (no cushion there)
-export function isInPocketGap(pos: Vec2, table: Table, pockets: Pocket[]): boolean {
-  const r = BALL_RADIUS;
-  const h = table.height;
-
-  for (const pocket of pockets) {
-    const halfMouth = pocket.mouthWidth / 2;
-    const [cx, cy] = pocket.center;
-
-    if (pocket.type === "side") {
-      // Side pockets: gap along the x-axis at y=0 or y=h
-      // Ball hits rail at y=r or y=h-r; check if x is within mouth
-      if (Math.abs(pos[0] - cx) <= halfMouth) {
-        if (cy === 0 && pos[1] <= r + 0.01) return true;
-        if (cy === h && pos[1] >= h - r - 0.01) return true;
-      }
-    } else {
-      // Corner pockets: gap near the corner on both adjacent rails
-      // Check if position is within mouthWidth of the corner along either axis
-      if (Math.abs(pos[0] - cx) <= pocket.mouthWidth && Math.abs(pos[1] - cy) <= pocket.mouthWidth) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function predictRailCollisionPosition(
+// Predicts collision with the earliest of a set of bounded ball-center collision segments
+// (straight rail pieces and/or angled jaw noses — see jaw-geometry.ts, both share the same
+// CushionSegment shape). Exact closed-form approach: solve the quadratic-in-acceleration for
+// when the ball's center reaches a segment's line, then clamp to the segment's finite
+// extent. Rail and jaw segments tile the table boundary with no gap or overlap (each rail
+// piece is bounded exactly by the heels of the jaw segments flanking it), so racing them all
+// by time — rather than treating the rail as an infinite line with a special-cased
+// exclusion zone — is both simpler and exact: whichever segment the ball's center actually
+// reaches first wins, with no separate notion of "is this position in a gap".
+function predictSegmentCollision(
   ball: BallState,
   table: Table,
-): { time: number; position: Vec2 } | null {
-  const [vx, vy] = ball.vel;
-  const [x, y] = ball.pos;
-  const r = ball.radius;
+  segments: CushionSegment[],
+): { time: number; normal: Vec2 } | null {
   const a = ballAcceleration(ball, G);
-  const pockets = getPockets(table);
-
-  // Acceleration is only constant within the ball's current motion regime, so cap
-  // candidate roots at the next state transition (same approach as predictBallBallCollision).
   const tMax = predictStateTransition(ball) ?? Infinity;
 
-  // Solve for time to reach each rail boundary using exact kinematics:
-  // pos(t) = pos + vel*t + 0.5*a*t²
-  // For x-boundary: x + vx*t + 0.5*ax*t² = boundary → 0.5*ax*t² + vx*t + (x - boundary) = 0
-  const collisions: { time: number; position: Vec2 }[] = [];
+  let best: { time: number; normal: Vec2 } | null = null;
 
-  const boundaries: { axis: 0 | 1; value: number }[] = [];
-  if (vx > 0 || a[0] > 0) boundaries.push({ axis: 0, value: table.width - r });
-  if (vx < 0 || a[0] < 0) boundaries.push({ axis: 0, value: r });
-  if (vy > 0 || a[1] > 0) boundaries.push({ axis: 1, value: table.height - r });
-  if (vy < 0 || a[1] < 0) boundaries.push({ axis: 1, value: r });
+  for (const seg of segments) {
+    const segVec = sub(seg.p2, seg.p1);
+    const segLen = norm(segVec);
+    const segDir = scale(segVec, 1 / segLen);
 
-  for (const b of boundaries) {
-    const p0 = ball.pos[b.axis];
-    const v0 = ball.vel[b.axis];
-    const a0 = a[b.axis];
-    // 0.5*a0*t² + v0*t + (p0 - b.value) = 0
-    const coeffA = 0.5 * a0;
-    const coeffB = v0;
-    const coeffC = p0 - b.value;
+    // p1/p2 already sit on the ball-center collision line (offset by BALL_RADIUS from the
+    // true cushion surface during construction — see jaw-geometry.ts), so the condition is
+    // simply dot(pos(t) - p1, normal) = 0, not offset by radius again.
+    const p0rel = sub(ball.pos, seg.p1);
+    const coeffA = 0.5 * dot(a, seg.normal);
+    const coeffB = dot(ball.vel, seg.normal);
+    const coeffC = dot(p0rel, seg.normal);
 
-    let roots: number[];
-    if (Math.abs(coeffA) < 1e-12) {
-      // Linear: v0*t + (p0 - b.value) = 0
-      if (Math.abs(coeffB) < 1e-12) continue;
-      roots = [-coeffC / coeffB];
-    } else {
-      const disc = coeffB * coeffB - 4 * coeffA * coeffC;
-      if (disc < 0) continue;
-      const sqrtDisc = Math.sqrt(disc);
-      roots = [(-coeffB + sqrtDisc) / (2 * coeffA), (-coeffB - sqrtDisc) / (2 * coeffA)];
+    let coeffs = [coeffA, coeffB, coeffC];
+    while (coeffs.length > 1 && coeffs[0] === 0) {
+      coeffs.shift();
     }
+    if (coeffs.length <= 1) continue;
 
-    for (const t of roots) {
-      if (t <= 1e-6) continue;
-      // Compute exact position at time t
-      const px = x + vx * t + 0.5 * a[0] * t * t;
-      const py = y + vy * t + 0.5 * a[1] * t * t;
-      collisions.push({ time: t, position: [px, py] });
+    for (const t of solvePolynomial(coeffs)) {
+      if (t <= 1e-6 || t > tMax) continue;
+      if (best !== null && t >= best.time) continue;
+
+      // Only a genuine approach (signed distance from the face decreasing through zero)
+      // counts as a collision — a root where the ball is moving away from the face is
+      // either separating or, at a segment's own endpoint, just the ball passing tangent
+      // to this segment's infinite line while actually under an adjoining segment's
+      // jurisdiction (e.g. rolling straight along a rail, through the heel, onto a jaw).
+      const derivAtT = coeffB + 2 * coeffA * t;
+      if (derivAtT >= 0) continue;
+
+      const pos = add(add(ball.pos, scale(ball.vel, t)), scale(a, 0.5 * t * t));
+      const s = dot(sub(pos, seg.p1), segDir);
+      if (s < -1e-6 || s > segLen + 1e-6) continue;
+
+      best = { time: t, normal: seg.normal };
     }
   }
 
-  // Filter out collisions in pocket zones and beyond the current motion regime's validity
-  const valid = collisions.filter(
-    (c) => c.time > 1e-6 && c.time <= tMax && !isInPocketGap(c.position, table, pockets),
-  );
-  if (valid.length === 0) return null;
+  return best;
+}
 
-  valid.sort((a, b) => a.time - b.time);
-  return valid[0];
+// All cushion collisions (straight rail pieces + angled jaw noses) raced together — see
+// predictSegmentCollision. This is what computeNextEvent uses; predictRailCollision and
+// predictJawCollision below are the same underlying race restricted to just one segment
+// set, kept for callers/tests that only care about one kind of cushion.
+export function predictCushionCollision(
+  ball: BallState,
+  table: Table,
+): { time: number; normal: Vec2 } | null {
+  const segments = [...getRailSegments(table), ...getJawSegments(table)];
+  return predictSegmentCollision(ball, table, segments);
 }
 
 export function predictRailCollision(
   ball: BallState,
   table: Table,
 ): number | null {
-  const result = predictRailCollisionPosition(ball, table);
-  if (result === null) return null;
-  return result.time;
+  const result = predictSegmentCollision(ball, table, getRailSegments(table));
+  return result ? result.time : null;
+}
+
+export function predictJawCollision(
+  ball: BallState,
+  table: Table,
+): { time: number; normal: Vec2 } | null {
+  return predictSegmentCollision(ball, table, getJawSegments(table));
 }
 
 export function predictStateTransition(ball: BallState): number | null {
@@ -275,15 +267,17 @@ export function computeNextEvent(
     }
   }
 
-  // rail collisions
+  // cushion collisions (straight rail pieces + angled jaw noses, raced together as one
+  // set of bounded segments — see predictCushionCollision / getRailSegments / getJawSegments)
   for (let i = 0; i < state.balls.length; i++) {
-    const t = predictRailCollision(state.balls[i], table);
-    if (t !== null && (earliest === null || state.time + t < earliest.time)) {
+    const result = predictCushionCollision(state.balls[i], table);
+    if (result !== null && (earliest === null || state.time + result.time < earliest.time)) {
       earliest = {
-        time: state.time + t,
+        time: state.time + result.time,
         eventType: "RAIL_COLLISION",
         a: i,
         b: null,
+        normal: result.normal,
       };
     }
   }

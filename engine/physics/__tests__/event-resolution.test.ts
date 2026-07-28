@@ -2,6 +2,7 @@ import { BallState, MotionState } from "../ball-state";
 import { BALL_RADIUS, G, RAIL_RESTITUTION, STANDARD_9_FOOT } from "../constants";
 import { resolveEvent } from "../event-resolution";
 import type { Event } from "../event-prediction";
+import { getJawSegments } from "../jaw-geometry";
 import { slidingMotion } from "../motion-models";
 import { SimulationState } from "../simulation-state";
 import { cross, dot, norm, normalize, rotate90, sub, scale, add } from "../vec2";
@@ -418,6 +419,62 @@ test("resolve rail collision leaves omega not quite perpendicular to vel when si
   // omega is completely untouched by the bounce (only vel/spinZ change), so it no longer
   // points anywhere close to perpendicular to the new (reflected) vel.
   expect(Math.abs(dot(ball.vel, ball.omega))).toBeGreaterThan(1e-3);
+});
+
+// ── resolve_event: jaw (angled) rail collisions via event.normal ──
+//
+// Regression coverage for wiring jaw/nose cushion collisions through the existing
+// RAIL_COLLISION machinery: resolveRailCollision already accepted an arbitrary normal, so
+// the only change was resolveEvent preferring event.normal when present, falling back to
+// the axis-aligned derivation otherwise. These confirm both paths.
+
+test("resolve event rail collision with an arbitrary non-axis-aligned normal reflects velocity correctly", () => {
+  const normal = normalize([1, 2] as [number, number]);
+  const ball = new BallState([1.0, 0.7], [2.0, -1.0], [0, 0], MotionState.SLIDING);
+  const velBefore: [number, number] = [...ball.vel];
+  const state = new SimulationState([ball], 0.0);
+  const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null, normal };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+
+  // Tangential component preserved, normal component negated and scaled by restitution —
+  // the same reflection resolveRailCollision already applies for axis-aligned rails, just
+  // decomposed against an arbitrary normal instead of [1,0]/[0,1].
+  const vnBefore = dot(velBefore, normal);
+  const vtBefore = sub(velBefore, scale(normal, vnBefore));
+  const vnAfter = dot(ball.vel, normal);
+  const vtAfter = sub(ball.vel, scale(normal, vnAfter));
+
+  expect(q3(vtAfter[0])).toBe(q3(vtBefore[0]));
+  expect(q3(vtAfter[1])).toBe(q3(vtBefore[1]));
+  expect(q3(vnAfter)).toBe(q3(-RAIL_RESTITUTION * vnBefore));
+});
+
+test("resolve event rail collision without a normal falls back to the axis-aligned derivation (no regression)", () => {
+  // Same setup as "resolve rail collision perpendicular" — confirms omitting event.normal
+  // (as every pre-existing Event literal in this file does) leaves behavior unchanged.
+  const ball = new BallState(
+    [STANDARD_9_FOOT.width - BALL_RADIUS, 0.7],
+    [3.0, 0.0],
+    [0, 0],
+    MotionState.SLIDING,
+  );
+  const state = new SimulationState([ball], 0.0);
+  const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+  expect(q3(ball.vel[0])).toBe("-2.460");
+  expect(q3(ball.vel[1])).toBe("0.000");
+});
+
+test("resolve event rail collision with a real jaw-segment normal bounces the ball back into play", () => {
+  const seg = getJawSegments(STANDARD_9_FOOT)[0];
+  // Approaching the face head-on (velocity opposite the outward normal).
+  const ball = new BallState([1.0, 0.7], [-seg.normal[0] * 2, -seg.normal[1] * 2], [0, 0], MotionState.SLIDING);
+  const state = new SimulationState([ball], 0.0);
+  const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null, normal: seg.normal };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+
+  // Was approaching (negative dot with normal); after reflection it's moving away (positive).
+  expect(dot(ball.vel, seg.normal)).toBeGreaterThan(0);
 });
 
 // ── resolve_event: state changes ──

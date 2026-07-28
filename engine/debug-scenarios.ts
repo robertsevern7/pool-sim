@@ -140,6 +140,29 @@ export const DEBUG_SCENARIOS: Scenario[] = [
       obj([2.7, 0.15], 1),
     ];
   }),
+  scenario("corner_jaw_skim", () => {
+    // Regression demo: this trajectory skims through the top-right corner pocket's mouth at
+    // a shallow angle, missing the small capture (fall) circle. Before the fix, the physics
+    // engine had no collision geometry for the angled jaw/nose cushions that bridge the
+    // straight rail to a pocket opening — a ball on this path would sail straight off the
+    // table and never stop. It now bounces off the jaw and stays in play. See
+    // jaw-geometry.ts and predictJawCollision in engine/physics/event-prediction.ts.
+    const pos: Vec2 = [TABLE.width - 0.4, R + 0.01];
+    const vel: Vec2 = [4, 0.3];
+    return [new BallState(pos, vel, [0, 0], MotionState.SLIDING)];
+  }),
+  scenario("straight_down_x15th", () => {
+    // Debug scenario: a ball shot straight down the RENDERED table. TableView's toScreen
+    // maps engine pos[0] -> screen-y and pos[1] -> screen-x, so "straight down" (screen-
+    // vertical) means moving along pos[0] with pos[1] held fixed, and the fixed on-screen
+    // x position (1/15 of the way across the table, i.e. table height / 15 — screen-x
+    // corresponds to the engine's height axis) sits close enough to the corner to be near
+    // jaw territory. Checks whether the ball correctly bounces off the plain straight rail
+    // here rather than skipping ahead to a jaw/corner collision.
+    const screenXPos = TABLE.height / 15;
+    const startX = R + 0.05;
+    return [new BallState([startX, screenXPos], [3, 0], [0, 0], MotionState.ROLLING)];
+  }),
   scenario("draw_creep", () => {
     // A full/head-on hit transfers the cue ball's entire velocity to the object ball
     // (there's no tangential component to leave behind), so the cue ball's vel drops to

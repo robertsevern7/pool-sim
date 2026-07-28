@@ -1,5 +1,7 @@
 import { BallState, MotionState } from "../ball-state";
 import { BALL_RADIUS, G, STANDARD_9_FOOT } from "../constants";
+import { computeNextEvent } from "../event-prediction";
+import { resolveEvent } from "../event-resolution";
 import { cueStrike, rollingMotion, slidingMotion } from "../motion-models";
 import { SimulationState } from "../simulation-state";
 import { advanceState, simulate } from "../simulator";
@@ -126,6 +128,58 @@ test("simulate ball hits rail and stops", () => {
   simulate(state, STANDARD_9_FOOT);
   expect(ball.motion).toBe(MotionState.STOPPED);
   expect(norm(ball.vel)).toBeCloseTo(0, 6);
+});
+
+// ── regression: balls escaping near a pocket mouth ──
+//
+// Direct regression test for the reported bug: a ball skimming through a pocket's mouth
+// "gap" at a shallow angle — missing the small capture (fall) circle — used to have nothing
+// to bounce off (the engine had no collision geometry for the angled jaw/nose cushions real
+// tables use there) and would sail past the table's coordinate bounds forever. This drives
+// the event loop itself (mirroring what simulate() does internally) so it can sample the
+// ball's position after every step and confirm it never wanders off into open space.
+
+test("regression: ball skimming past a pocket mouth never escapes — it either pots or comes to rest", () => {
+  const ball = new BallState(
+    [STANDARD_9_FOOT.width - 0.4, BALL_RADIUS + 0.01],
+    [4, 0.3],
+    [0, 0],
+    MotionState.SLIDING,
+  );
+  const state = new SimulationState([ball], 0.0);
+  // Generous slack: the pocket mouth/fall-circle legitimately extends a bit past the
+  // table's nominal rectangle (corner fallCenters sit outside it by design).
+  const margin = 0.2;
+  let outcome: "potted" | "stopped" | "unresolved" = "unresolved";
+
+  for (let step = 0; step < 10000; step++) {
+    const event = computeNextEvent(state, STANDARD_9_FOOT);
+    if (event === null) break;
+    const dt = event.time - state.time;
+    if (dt < 0) break;
+    advanceState(state, dt);
+
+    if (state.balls.length > 0) {
+      const [x, y] = state.balls[0].pos;
+      expect(x).toBeGreaterThan(-margin);
+      expect(x).toBeLessThan(STANDARD_9_FOOT.width + margin);
+      expect(y).toBeGreaterThan(-margin);
+      expect(y).toBeLessThan(STANDARD_9_FOOT.height + margin);
+    }
+
+    resolveEvent(state, event, STANDARD_9_FOOT);
+
+    if (state.balls.length === 0) {
+      outcome = "potted";
+      break;
+    }
+    if (state.balls[0].motion === MotionState.STOPPED) {
+      outcome = "stopped";
+      break;
+    }
+  }
+
+  expect(outcome).not.toBe("unresolved");
 });
 
 // ── simulate: edge cases ──

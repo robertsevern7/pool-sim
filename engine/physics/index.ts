@@ -17,3 +17,5 @@ export {
   getPockets,
 } from "./constants";
 export type { Pocket } from "./constants";
+export { getJawSegments } from "./jaw-geometry";
+export type { JawSegment } from "./jaw-geometry";
