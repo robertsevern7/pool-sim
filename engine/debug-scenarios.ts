@@ -1,11 +1,26 @@
 import { BallState, MotionState } from "./physics/ball-state";
-import { BALL_RADIUS, STANDARD_9_FOOT, MU_ROLL, G, MAX_SQUIRT_ANGLE } from "./physics/constants";
+import { BALL_RADIUS, STANDARD_9_FOOT, MU_ROLL, G, MAX_SQUIRT_ANGLE, POCKET_CONFIG } from "./physics/constants";
 import { cueStrike } from "./physics/motion-models";
-import { normalize, rotate90, rotateByAngle, scale, Vec2 } from "./physics/vec2";
+import { add, normalize, rotate90, rotateByAngle, scale, sub, Vec2 } from "./physics/vec2";
 import { scenario, obj, type Scenario } from "./scenarios";
 
 const TABLE = STANDARD_9_FOOT;
 const R = BALL_RADIUS;
+const INCHES_TO_M = 0.0254;
+
+// A rendered diamond marker sits on the wooden rail itself, not on the cushion face where
+// the ball actually contacts — it's set back beyond the cushion by (at least) the cushion's
+// own thickness. That matters for sighting: a straight line from a near point (a corner, or
+// another diamond) THROUGH the diamond's true, set-back position crosses the cushion face
+// at a different along-rail spot than the diamond's own along-rail coordinate — sighting
+// directly at "the diamond's coordinate, placed on the cushion line" is a different, wrong
+// line. This is the diamond's true position (fraction along the rail, at the rail's real
+// perpendicular setback), for building a sightline through it — not a collision target.
+const CUSHION_SETBACK_M = POCKET_CONFIG.cushionThickness * INCHES_TO_M;
+function longRailDiamond(fraction: number, side: "near" | "far"): Vec2 {
+  const y = side === "near" ? -CUSHION_SETBACK_M : TABLE.height + CUSHION_SETBACK_M;
+  return [fraction * TABLE.width, y];
+}
 
 const GAP = TABLE.width / 3;
 const CUE_X = TABLE.width / 2 - GAP / 2;
@@ -38,8 +53,12 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     obj([OBJ_X, CY], 1),
   ]),
   scenario("lag_shot", () => {
+    // Tuned (via simulation, not closed-form) so the ball bounces off the far rail and
+    // rolls all the way back to just touch the near rail — the far-rail rebound isn't a
+    // simple restitution scaling, since the ball's post-bounce spin doesn't match its
+    // reversed velocity, so it slides before settling back into a roll.
     const baulkX = TABLE.width / 4;
-    const speed = 1.832;
+    const speed = 1.936;
     const vel: Vec2 = [speed, 0];
     return [
       new BallState([baulkX, CY], vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING),
@@ -135,9 +154,11 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     // would slide past the top-right corner, but retains its pre-collision topspin —
     // now misaligned with the new direction — so it curves the rest of the way in.
     // See predictPocketEntry in engine/physics/event-prediction.ts.
+    // Positions are the original demo's, scaled by TABLE.width / 2.84 (this table's width
+    // when the demo was tuned) — verified to still curve the cue ball into the pocket.
     return [
-      cueStrike([2.2, 0.14], [1, 0], 2.5, 1.0),
-      obj([2.7, 0.15], 1),
+      cueStrike([1.9676, 0.1252], [1, 0], 2.5, 1.0),
+      obj([2.4148, 0.1342], 1),
     ];
   }),
   scenario("corner_jaw_skim", () => {
@@ -230,4 +251,56 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     obj([OBJ_X, CY], 1),
     obj([OBJ_X, CY + 0.3], 10),
   ]),
+
+  // ── Reference shots ──────────────────────────────────────────────────
+  // Real diamond-system shots an experienced player would expect to work, used to tune
+  // (and now guard, see engine/physics/__tests__/reference-shots.test.ts) the rail-cushion
+  // physics — RAIL_CONTACT_HEIGHT_RATIO and RAIL_TANGENTIAL_RESTITUTION in particular.
+  // Diamonds are at 1/8-table-length intervals along each long rail (skipping the side
+  // pocket at the midpoint), matching TableView's own diamond markers.
+
+  scenario("bank_corner_to_2nd", () => {
+    // Sight from the corner THROUGH the 2nd diamond's true (rendered, set-back) position —
+    // not at the diamond's raw along-rail coordinate placed on the cushion line, which is a
+    // different, incorrect line (see CUSHION_SETBACK_M / longRailDiamond above).
+    const corner: Vec2 = [0, 0];
+    const diamond2 = longRailDiamond(2 / 8, "far");
+    const dir = normalize(sub(diamond2, corner));
+    const start: Vec2 = scale(dir, 0.28); // roughly in front of the corner, on the sightline
+    const vel = scale(dir, 2.75); // medium pace
+    return [new BallState(start, vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING)];
+  }, { section: "Reference Shots" }),
+
+  scenario("bank_1st_to_3rd_firm", () => {
+    // The cue ball's placement line runs through the rendered 1st diamond's and rendered
+    // 3rd diamond's TRUE (set-back) positions — the ball sits on that line, roughly in
+    // front of the 1st diamond — and the shot is AIMED through that same rendered 3rd
+    // diamond's true position (see CUSHION_SETBACK_M / longRailDiamond above).
+    const diamond1 = longRailDiamond(1 / 8, "near");
+    const diamond3 = longRailDiamond(3 / 8, "far");
+    const start = add(diamond1, scale(sub(diamond3, diamond1), 0.08));
+    const dir = normalize(sub(diamond3, start));
+    // Firm — cue ball is still sliding (not yet naturally rolling) when it reaches the rail.
+    return [cueStrike(start, dir, 3.6, 0, 0)];
+  }, { section: "Reference Shots" }),
+
+  scenario("three_rail_corner5", () => {
+    // The side pocket sits at the rail-numbering midpoint (fraction 4/8). The 4th diamond
+    // — counting only the actual rendered markers, 1st through 6th, which skip over the
+    // pocket itself — is the marker directly past it in the direction of travel, at
+    // fraction 5/8 (LONG_RAIL_POSITIONS' own "5"). Aiming at the midpoint itself clips the
+    // pocket's jaw and gets captured immediately with no rail bounce at all; this marker
+    // sits a full diamond-spacing clear of the pocket's mouth. Sight through its TRUE
+    // (rendered, set-back) position, same as the corner-to-diamond shots above — not its
+    // raw along-rail coordinate placed on the cushion line.
+    const start: Vec2 = [0.03, 0.03]; // essentially at the corner
+    const firstRailTarget = longRailDiamond(4.85 / 8, "far");
+    const desiredDir = normalize(sub(firstRailTarget, start));
+    // Sidespin squirts the cue ball's actual initial path off the sighted line (see
+    // throw_off_line above) — pre-compensate so it actually travels toward the diamond.
+    const sidespin = 0.15; // a hair of running english
+    const squirtAngle = -sidespin * MAX_SQUIRT_ANGLE;
+    const aimDir = rotateByAngle(desiredDir, -squirtAngle);
+    return [cueStrike(start, aimDir, 3.25, 0, sidespin)];
+  }, { section: "Reference Shots" }),
 ];

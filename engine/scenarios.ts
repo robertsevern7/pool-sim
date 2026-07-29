@@ -18,12 +18,14 @@ export interface Scenario {
   createBalls: () => BallState[];
   /** If true, user must place the cue ball before playing */
   placeCue?: boolean;
+  /** Groups this scenario under a labeled section in the debug scenarios list */
+  section?: string;
 }
 
 export function scenario(
   id: ScenarioId,
   createBalls: () => BallState[],
-  options?: { placeCue?: boolean },
+  options?: { placeCue?: boolean; section?: string },
 ): Scenario {
   const { name, description } = strings.scenarios[id];
   return { id, name, description, createBalls, ...options };

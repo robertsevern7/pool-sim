@@ -1,5 +1,13 @@
 import { BallState, MotionState } from "./ball-state";
-import { BALL_FRICTION, BALL_RADIUS, RAIL_FRICTION, RAIL_RESTITUTION, Table } from "./constants";
+import {
+  BALL_FRICTION,
+  BALL_RADIUS,
+  RAIL_CONTACT_HEIGHT_RATIO,
+  RAIL_FRICTION,
+  RAIL_RESTITUTION,
+  RAIL_TANGENTIAL_RESTITUTION,
+  Table,
+} from "./constants";
 import type { Event } from "./event-prediction";
 import type { SimulationState } from "./simulation-state";
 import { sub, dot, scale, norm, add, rotate90, Vec2 } from "./vec2";
@@ -132,15 +140,24 @@ function resolveRailCollision(
   const vt = sub(ball.vel, vn);
   const normalImpulse = ball.mass * norm(vn) * (1 + restitution);
 
-  ball.vel = sub(vt, scale(vn, restitution));
+  // Tangential velocity isn't fully preserved either — see RAIL_TANGENTIAL_RESTITUTION.
+  ball.vel = sub(scale(vt, RAIL_TANGENTIAL_RESTITUTION), scale(vn, restitution));
 
-  // Rail throw: sidespin (spinZ) gives the ball-cushion contact point a tangential slip,
-  // same mechanism as ball-ball throw (the horizontal-plane omega used for cloth contact
-  // only contributes a *vertical* velocity at this contact, which the table's normal force
+  // The cushion nose contacts the ball above its center (see RAIL_CONTACT_HEIGHT_RATIO), so
+  // the normal impulse just applied doesn't act through the center — it also torques the
+  // ball about the rotate90(normal) axis, changing rolling-plane spin (omega), not just
+  // spinZ. Unlike ball-ball contact (which is center-to-center, so omega never enters that
+  // collision), this height offset is rail-specific.
+  const contactHeight = RAIL_CONTACT_HEIGHT_RATIO * BALL_RADIUS;
+  ball.omega = add(ball.omega, scale(rotate90(normal), (contactHeight * normalImpulse) / momentOfInertia(ball.mass)));
+
+  // Rail throw: sidespin (spinZ) gives the ball-cushion contact point an *additional*
+  // tangential slip on top of RAIL_TANGENTIAL_RESTITUTION's speed-only effect above — same
+  // mechanism as ball-ball throw (the horizontal-plane omega used for cloth contact only
+  // contributes a *vertical* velocity at this contact, which the table's normal force
   // absorbs — we don't model that). This is "cushion english": a spinning ball comes off a
-  // rail at a different angle than pure geometric reflection predicts. Deliberately
-  // spin-only, not tangential-velocity-based, so a spinless bounce still reflects with vt
-  // exactly preserved, as tested elsewhere.
+  // rail at a different angle than a spinless one at the same speed, on top of the
+  // spin-independent tangential loss every bounce gets.
   const tangentDir = rotate90(normal);
   const slipTangential = -ball.spinZ * BALL_RADIUS;
 

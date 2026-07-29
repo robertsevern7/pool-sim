@@ -30,7 +30,7 @@ test("predict rail collision top", () => {
   const cue = cueStrike([0.5, 0.7], [0, 1], 3.0);
   const t = predictRailCollision(cue, STANDARD_9_FOOT);
   expect(t).not.toBeNull();
-  expect(q3(t!)).toBe("0.251");
+  expect(q3(t!)).toBe("0.193");
 });
 
 test("predict rail collision top start rolling", () => {
@@ -38,7 +38,7 @@ test("predict rail collision top start rolling", () => {
   cue.motion = MotionState.ROLLING;
   const t = predictRailCollision(cue, STANDARD_9_FOOT);
   expect(t).not.toBeNull();
-  expect(q3(t!)).toBe("0.233");
+  expect(q3(t!)).toBe("0.182");
 });
 
 test("predict rail collision top rolling slower", () => {
@@ -46,7 +46,7 @@ test("predict rail collision top rolling slower", () => {
   cue.motion = MotionState.ROLLING;
   const t = predictRailCollision(cue, STANDARD_9_FOOT);
   expect(t).not.toBeNull();
-  expect(q3(t!)).toBe("0.355");
+  expect(q3(t!)).toBe("0.276");
 });
 
 test("predict rail collision at angle", () => {

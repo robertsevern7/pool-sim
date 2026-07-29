@@ -1,10 +1,19 @@
 import { BallState, MotionState } from "../ball-state";
-import { BALL_RADIUS, G, RAIL_RESTITUTION, STANDARD_9_FOOT } from "../constants";
+import {
+  BALL_MASS,
+  BALL_RADIUS,
+  G,
+  RAIL_CONTACT_HEIGHT_RATIO,
+  RAIL_RESTITUTION,
+  RAIL_TANGENTIAL_RESTITUTION,
+  STANDARD_9_FOOT,
+} from "../constants";
 import { resolveEvent } from "../event-resolution";
-import type { Event } from "../event-prediction";
+import { computeNextEvent, type Event } from "../event-prediction";
 import { getJawSegments } from "../jaw-geometry";
 import { slidingMotion } from "../motion-models";
 import { SimulationState } from "../simulation-state";
+import { advanceState } from "../simulator";
 import { cross, dot, norm, normalize, rotate90, sub, scale, add } from "../vec2";
 
 function q3(n: number): string {
@@ -294,7 +303,7 @@ test("resolve rail collision angled", () => {
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("2.000");
+  expect(q3(ball.vel[0])).toBe("1.840"); // tangential scaled by RAIL_TANGENTIAL_RESTITUTION (0.92)
   expect(q3(ball.vel[1])).toBe("-1.640");
 });
 
@@ -315,9 +324,9 @@ test("resolve rail collision sets sliding", () => {
 //
 // Regression coverage for adding rail spin transfer: cushion contact now has a small
 // tangential friction impulse driven by spinZ (vertical-axis spin), which changes a
-// spinning ball's rebound angle off a rail — the classic "cushion english" effect.
-// Deliberately spin-only, not tangential-velocity-based, so a spinless bounce still
-// reflects with vt exactly preserved (see "resolve rail collision angled" above).
+// spinning ball's rebound angle off a rail — the classic "cushion english" effect, on top
+// of the spin-independent RAIL_TANGENTIAL_RESTITUTION scaling every bounce gets (see
+// "resolve rail collision angled" above).
 
 test("resolve rail collision with no sidespin has zero rail throw (regression)", () => {
   const ball = new BallState(
@@ -329,7 +338,7 @@ test("resolve rail collision with no sidespin has zero rail throw (regression)",
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("2.000");
+  expect(q3(ball.vel[0])).toBe("1.840");
   expect(q3(ball.vel[1])).toBe("-1.640");
 });
 
@@ -347,7 +356,7 @@ test("resolve rail collision with sidespin changes the rebound angle (cushion th
   resolveEvent(state, event, STANDARD_9_FOOT);
   // Hand-derived reference values for this exact setup, cross-checked against the ball-ball
   // throw formula (same mechanism, wall-fixed instead of a second ball).
-  expect(q3(ball.vel[0])).toBe("2.510");
+  expect(q3(ball.vel[0])).toBe("2.350");
   expect(q3(ball.vel[1])).toBe("-1.640");
   expect(q3(ball.spinZ)).toBe("5.416");
 });
@@ -398,10 +407,11 @@ test("resolve rail collision throw reduces spin-driven slip (friction opposes it
 });
 
 test("resolve rail collision leaves omega not quite perpendicular to vel when sidespin throws it (curves after the bounce)", () => {
-  // Side note from the TODO: since omega (follow/draw axis) is untouched by a rail bounce,
-  // a spinning ball should already curve afterward for the same reason the ball-ball
-  // curving fix works — a natural-roll ball's omega is tied to its *pre-bounce* vel
-  // direction, which the bounce changes, so omega and the new vel end up misaligned.
+  // A natural-roll ball's omega is tied to its *pre-bounce* vel direction, which the bounce
+  // changes. The rail-height torque (RAIL_CONTACT_HEIGHT_RATIO, see resolveRailCollision)
+  // corrects omega partway toward the new direction but — outside of special-case angles —
+  // not all the way, so omega and the new vel still end up misaligned and the ball still
+  // curves afterward.
   const R = BALL_RADIUS;
   const vel0: [number, number] = [2.0, 2.0];
   // Natural roll before impact: omega locked to the incoming velocity direction.
@@ -416,9 +426,35 @@ test("resolve rail collision leaves omega not quite perpendicular to vel when si
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
 
-  // omega is completely untouched by the bounce (only vel/spinZ change), so it no longer
-  // points anywhere close to perpendicular to the new (reflected) vel.
+  // omega isn't fully realigned by the bounce (only partially corrected, plus spinZ change),
+  // so it no longer points anywhere close to perpendicular to the new (reflected) vel.
   expect(Math.abs(dot(ball.vel, ball.omega))).toBeGreaterThan(1e-3);
+});
+
+test("resolve rail collision torques omega toward the post-bounce rolling direction (rail contact height)", () => {
+  // The cushion nose contacts the ball above its center (RAIL_CONTACT_HEIGHT_RATIO), so the
+  // normal impulse also applies a torque about the rotate90(normal) axis — this is what's
+  // exercised above ("leaves omega not quite perpendicular..."), quantified precisely here.
+  const R = BALL_RADIUS;
+  const vel0: [number, number] = [2.0, 2.0];
+  const omega0 = scale(rotate90(vel0), 1 / R);
+  const ball = new BallState([0.5, STANDARD_9_FOOT.height - R], vel0, omega0, MotionState.ROLLING);
+  const state = new SimulationState([ball], 0.0);
+  const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
+  resolveEvent(state, event, STANDARD_9_FOOT);
+
+  const normal: [number, number] = [0, -1]; // ball is at the y = height rail
+  const vn = scale(normal, dot(vel0, normal));
+  const normalImpulse = BALL_MASS * norm(vn) * (1 + RAIL_RESTITUTION);
+  const momentOfInertia = (2 / 5) * BALL_MASS * R * R;
+  const contactHeight = RAIL_CONTACT_HEIGHT_RATIO * R;
+  const expectedOmega = add(
+    omega0,
+    scale(rotate90(normal), (contactHeight * normalImpulse) / momentOfInertia),
+  );
+
+  expect(ball.omega[0]).toBeCloseTo(expectedOmega[0], 6);
+  expect(ball.omega[1]).toBeCloseTo(expectedOmega[1], 6);
 });
 
 // ── resolve_event: jaw (angled) rail collisions via event.normal ──
@@ -436,16 +472,17 @@ test("resolve event rail collision with an arbitrary non-axis-aligned normal ref
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null, normal };
   resolveEvent(state, event, STANDARD_9_FOOT);
 
-  // Tangential component preserved, normal component negated and scaled by restitution —
-  // the same reflection resolveRailCollision already applies for axis-aligned rails, just
-  // decomposed against an arbitrary normal instead of [1,0]/[0,1].
+  // Tangential component scaled by RAIL_TANGENTIAL_RESTITUTION, normal component negated
+  // and scaled by restitution — the same reflection resolveRailCollision already applies
+  // for axis-aligned rails, just decomposed against an arbitrary normal instead of
+  // [1,0]/[0,1].
   const vnBefore = dot(velBefore, normal);
   const vtBefore = sub(velBefore, scale(normal, vnBefore));
   const vnAfter = dot(ball.vel, normal);
   const vtAfter = sub(ball.vel, scale(normal, vnAfter));
 
-  expect(q3(vtAfter[0])).toBe(q3(vtBefore[0]));
-  expect(q3(vtAfter[1])).toBe(q3(vtBefore[1]));
+  expect(q3(vtAfter[0])).toBe(q3(vtBefore[0] * RAIL_TANGENTIAL_RESTITUTION));
+  expect(q3(vtAfter[1])).toBe(q3(vtBefore[1] * RAIL_TANGENTIAL_RESTITUTION));
   expect(q3(vnAfter)).toBe(q3(-RAIL_RESTITUTION * vnBefore));
 });
 
@@ -475,6 +512,49 @@ test("resolve event rail collision with a real jaw-segment normal bounces the ba
 
   // Was approaching (negative dot with normal); after reflection it's moving away (positive).
   expect(dot(ball.vel, seg.normal)).toBeGreaterThan(0);
+});
+
+// ── regression: diamond-system bank shot shouldn't rebound absurdly long ──
+//
+// Reported bug: a rolling cue ball aimed (per the diamond system) from in front of the 2nd
+// diamond on one long rail at the 3rd diamond on the opposite rail, at a moderate pace,
+// should bank roughly back into the near-side side pocket at the table's midpoint. Before
+// the rail-contact-height torque was added (see RAIL_CONTACT_HEIGHT_RATIO), the ball's
+// pre-bounce topspin axis survived the rail bounce untouched, fighting the new (reflected)
+// velocity through the post-bounce slide and dragging the path down the rail, past the side
+// pocket, almost to the far corner — a bank several diamonds longer than intended.
+test("bank shot off a long rail returns close to the mirror-image target, not several diamonds long (regression)", () => {
+  const TABLE = STANDARD_9_FOOT;
+  const R = BALL_RADIUS;
+
+  // 2nd diamond on the y = 0 rail, pulled off the cushion a bit ("in front of" the diamond).
+  const start: [number, number] = [0.25 * TABLE.width, 0.15];
+  // 3rd diamond on the far (y = height) rail — the aiming target for the bank.
+  const target: [number, number] = [0.375 * TABLE.width, TABLE.height - R];
+
+  const dir = normalize(sub(target, start));
+  const speed = 2.0; // medium pace
+  const vel = scale(dir, speed);
+  const ball = new BallState(start, vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING);
+  const state = new SimulationState([ball], 0);
+
+  const railHitXs: number[] = [];
+  for (let i = 0; i < 30; i++) {
+    const event = computeNextEvent(state, TABLE);
+    if (!event) break;
+    advanceState(state, event.time - state.time);
+    resolveEvent(state, event, TABLE);
+    if (event.eventType === "RAIL_COLLISION") railHitXs.push(ball.pos[0]);
+  }
+
+  // First rail hit is the aimed-at bank off the far rail.
+  expect(q3(railHitXs[0])).toBe(q3(target[0]));
+
+  // Second rail hit is back on the near rail — the return leg of the bank. The side pocket
+  // sits at width / 2; landing within a diamond's width (one 8th of the table) of it is a
+  // sane bank, not the "several diamonds past it, headed for the corner" bug.
+  const sidePocketX = TABLE.width / 2;
+  expect(Math.abs(railHitXs[1] - sidePocketX)).toBeLessThan(TABLE.width / 8);
 });
 
 // ── resolve_event: state changes ──
