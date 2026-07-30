@@ -58,7 +58,7 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     // simple restitution scaling, since the ball's post-bounce spin doesn't match its
     // reversed velocity, so it slides before settling back into a roll.
     const baulkX = TABLE.width / 4;
-    const speed = 1.936;
+    const speed = 2.155;
     const vel: Vec2 = [speed, 0];
     return [
       new BallState([baulkX, CY], vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING),

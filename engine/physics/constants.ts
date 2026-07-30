@@ -1,60 +1,52 @@
 export interface Table {
   width: number; // meters
   height: number;
-  railRestitution: number;
 }
 
 export const G = 9.81;
 
 // cloth friction (sliding)
-export const MU_SLIDE = 0.2;
+export const MU_SLIDE = 0.1;
 
 // rolling resistance
 export const MU_ROLL = 0.03;
-
-// rail restitution
-export const RAIL_RESTITUTION = 0.82;
 
 // Ball-to-ball Coulomb friction coefficient — small but nonzero, responsible for "throw"
 // (a cut ball gets deflected slightly off the true line by cue-ball sidespin/english).
 export const BALL_FRICTION = 0.05;
 
-// Ball-to-cushion Coulomb friction coefficient — responsible for "cushion throw"/english
-// carrying through a rail bounce, changing the rebound angle. Notably higher than
-// BALL_FRICTION (cushion rubber grips more than a ball's phenolic surface does). Measured
-// value from Mathavan, Jackson & Parkin, "A theoretical analysis of billiard ball dynamics
-// under cushion impacts" (Proc. IMechE, 2010): coefficient of sliding friction ≈ 0.14
-// (alongside a cushion coefficient of restitution ≈ 0.98 for the raw normal impact — not
-// the same thing as this engine's RAIL_RESTITUTION, which is a separate, already-tuned
-// simplification of the whole tangential-preserving bounce).
-export const RAIL_FRICTION = 0.14;
+// --- Cushion (rail) impact model ---
+// Full 3D rigid-body impact analysis from Mathavan, Jackson & Parkin, "A theoretical
+// analysis of billiard ball dynamics under cushion impacts" (Proc. IMechE Vol. 224 Part C,
+// 2010) — see resolveRailCollision in event-resolution.ts for the implementation. Unlike a
+// flat vertical wall, a real cushion contacts the ball above its own equator (its rubber
+// nose is angled to stop the ball riding up), and the ball is in contact with the table
+// felt at the same time it's in contact with the cushion — two simultaneous, coupled
+// friction contacts, not one. That coupling — not a bolted-on extra torque term — is what
+// produces "cushion throw" and the height-dependent spin transfer we'd previously
+// approximated with separate tuned constants.
 
-// How far above the ball's center the cushion nose contacts it, as a fraction of ball
-// radius. WPA/BCA spec puts cushion nose height at ~63.5% of ball diameter (vs. the ball's
-// own equator, at 50% — i.e. center height), giving a theoretical estimate of
-// (0.635 - 0.5) * diameter = 0.27 * radius. That offset matters because the rail's normal
-// impulse, applied above center, also exerts a torque on the ball (rotate90(normal) axis) —
-// changing its rolling-plane spin, not just reflecting velocity. Skip this and a ball's
-// pre-bounce topspin axis survives the bounce unchanged, fighting the new velocity
-// direction through the post-bounce slide and throwing the rebound far wide of a mirror
-// angle — see resolveRailCollision in event-resolution.ts. The theoretical 0.27 undershoots
-// real banking/kicking behavior (a cushion's rubber compliance and contact patch add more
-// spin transfer than the bare geometric offset implies), so this is tuned up from that
-// estimate against the real-world reference shots in
-// engine/physics/__tests__/reference-shots.test.ts — see RAIL_TANGENTIAL_RESTITUTION below,
-// tuned alongside it.
-export const RAIL_CONTACT_HEIGHT_RATIO = 0.33;
+// Cushion nose height above the table, per WPA/BCA spec: h = 7R/5 (i.e. 63.5% of ball
+// diameter — the ball's own equator, by comparison, is at 50%, height R). The contact
+// point sits (7R/5 - R) = 2R/5 above the ball's center; since it's a point on the ball's
+// own spherical surface, the true contact normal there is tilted off horizontal by angle θ,
+// where sinθ = 2/5 (θ ≈ 23.6°) — not purely horizontal, the way a flat wall's normal would
+// be. This is a fixed geometric fact of the rail/ball geometry, not a tuned parameter.
+export const CUSHION_CONTACT_SIN_THETA = 2 / 5;
 
-// Fraction of tangential (along-rail) velocity a rail bounce retains. A real cushion
-// dissipates a little energy in the along-rail direction too — not just the
-// spin-driven throw already modeled below via RAIL_FRICTION — because the ball's own
-// tangential motion is itself a slip relative to the (stationary) cushion cloth, which
-// kinetic friction opposes during the impulse even with zero spin. Tuned jointly with
-// RAIL_CONTACT_HEIGHT_RATIO against engine/physics/__tests__/reference-shots.test.ts: with
-// this at 1.0 (full preservation), no value of RAIL_CONTACT_HEIGHT_RATIO reproduces all of
-// the reference shots at once — banks either come up short on the steep-angle shot or long
-// on the shallow one.
-export const RAIL_TANGENTIAL_RESTITUTION = 0.92;
+// Energetic coefficient of restitution (Stronge's definition — the negative ratio of work
+// done during restitution to work done during compression, along the cushion's true,
+// tilted contact normal) for the ball-cushion impact. Mathavan et al.'s value, fit against
+// their own high-speed-camera measurements.
+export const CUSHION_RESTITUTION = 0.98;
+
+// Coulomb sliding friction coefficient between the ball and the cushion (Mathavan et al.,
+// fit alongside CUSHION_RESTITUTION against the same measurements). This is the *cushion*
+// contact's friction; MU_SLIDE above is reused for the *table felt* contact, which is live
+// at the same time during a cushion impact (Mathavan et al. use 0.212, close enough to
+// MU_SLIDE's existing 0.2 — reusing MU_SLIDE keeps one felt-friction constant for the whole
+// engine rather than a second, near-duplicate value just for the rail).
+export const RAIL_FRICTION = 0.07;
 
 export const BALL_RADIUS = 0.028575; // meters
 export const BALL_MASS = 0.17;
@@ -79,7 +71,6 @@ export const MAX_SQUIRT_ANGLE = (2.5 * Math.PI) / 180; // ≈ 0.0436 rad
 export const STANDARD_9_FOOT: Table = {
   width: 2.54,
   height: 1.27,
-  railRestitution: RAIL_RESTITUTION,
 };
 
 // --- Pocket configuration (BCA spec) ---

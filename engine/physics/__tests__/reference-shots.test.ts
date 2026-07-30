@@ -1,8 +1,14 @@
-// Reference-shot suite: real diamond-system shots a pool player would expect to work,
-// used to tune (and now guard) the rail-cushion physics — RAIL_CONTACT_HEIGHT_RATIO and
-// RAIL_TANGENTIAL_RESTITUTION in particular. Each shot encodes a specific real-world
-// technique; if a future physics change breaks one of these, the game will have stopped
-// feeling correct to an experienced player even though nothing "looks" wrong in isolation.
+// Reference-shot suite: real diamond-system shots a pool player would expect to work, used
+// to guard the rail-cushion physics. Each shot encodes a specific real-world technique; if a
+// future physics change breaks one of these, the game will have stopped feeling correct to
+// an experienced player even though nothing "looks" wrong in isolation.
+//
+// The rail-cushion model (see resolveRailCollision in event-resolution.ts) now follows
+// Mathavan, Jackson & Parkin (2010) directly: every rail constant left in constants.ts is
+// either a fixed geometric fact (CUSHION_CONTACT_SIN_THETA) or a literature-fitted value
+// (CUSHION_RESTITUTION, RAIL_FRICTION) — there is no free "outcome tuning" knob left at the
+// physics-constant level. If one of these shots is to pot, the lever is the shot's own
+// aim/speed/spin below (or in engine/debug-scenarios.ts), not a rail constant.
 //
 // Aim/placement geometry below is kept in lockstep with the matching scenarios in
 // engine/debug-scenarios.ts (bank_corner_to_2nd, bank_1st_to_3rd_firm, three_rail_corner5)
