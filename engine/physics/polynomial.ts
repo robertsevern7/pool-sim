@@ -13,8 +13,25 @@ function solveLinear(a: number, b: number): number[] {
   return [-b / a];
 }
 
+// A leading coefficient that's numerically negligible relative to the next one down is
+// floating-point noise from upstream dot products (e.g. a ball whose acceleration happens
+// to land almost exactly perpendicular to a cushion's normal — an ordinary, common case,
+// not a contrived one), not a genuine higher-degree term. Treating it as exactly zero only
+// on `=== 0` misses that noise, and running the full quadratic/cubic/quartic formula on a
+// near-zero leading coefficient divides by that near-zero value — catastrophic
+// cancellation in the discriminant, then blown up by the division — which silently turns a
+// tiny rounding error into a badly wrong root (seen in practice as rail collisions
+// predicted tens of milliseconds early or late, or missed entirely when both roots come out
+// corrupted). Falling back to the lower-degree solver whenever the leading term couldn't
+// meaningfully move the root anyway avoids that instability.
+const NEGLIGIBLE_LEADING_COEFF_RATIO = 1e-9;
+
+function isNegligible(leading: number, next: number): boolean {
+  return Math.abs(leading) < NEGLIGIBLE_LEADING_COEFF_RATIO * Math.abs(next);
+}
+
 function solveQuadratic(a: number, b: number, c: number): number[] {
-  if (a === 0) return solveLinear(b, c);
+  if (a === 0 || isNegligible(a, b)) return solveLinear(b, c);
   const disc = b * b - 4 * a * c;
   if (disc < 0) return [];
   const sqrtDisc = Math.sqrt(disc);
@@ -22,7 +39,7 @@ function solveQuadratic(a: number, b: number, c: number): number[] {
 }
 
 function solveCubic(a: number, b: number, c: number, d: number): number[] {
-  if (a === 0) return solveQuadratic(b, c, d);
+  if (a === 0 || isNegligible(a, b)) return solveQuadratic(b, c, d);
 
   // Depress: t = x - b/(3a)
   const p = (3 * a * c - b * b) / (3 * a * a);
@@ -66,7 +83,7 @@ function solveQuartic(
   d: number,
   e: number,
 ): number[] {
-  if (a === 0) return solveCubic(b, c, d, e);
+  if (a === 0 || isNegligible(a, b)) return solveCubic(b, c, d, e);
 
   // Depress: x = t - b/(4a)
   const ba = b / a;

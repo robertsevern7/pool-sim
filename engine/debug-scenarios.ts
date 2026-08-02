@@ -37,11 +37,11 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     obj([OBJ_X, CY + R], 1),
   ]),
   scenario("stop_shot", () => [
-    cueStrike([CUE_X, CY], [1, 0], 3.0, -0.435),
+    cueStrike([CUE_X, CY], [1, 0], 3.0, -0.18),
     obj([OBJ_X, CY], 1),
   ]),
   scenario("half_ball_stun", () => [
-    cueStrike([CUE_X, CY], [1, 0], 3.0, -0.435),
+    cueStrike([CUE_X, CY], [1, 0], 3.0, -0.182),
     obj([OBJ_X, CY + R], 1),
   ]),
   scenario("max_draw", () => [
@@ -58,7 +58,7 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     // simple restitution scaling, since the ball's post-bounce spin doesn't match its
     // reversed velocity, so it slides before settling back into a roll.
     const baulkX = TABLE.width / 4;
-    const speed = 2.155;
+    const speed = 1.9785;
     const vel: Vec2 = [speed, 0];
     return [
       new BallState([baulkX, CY], vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING),
@@ -267,7 +267,7 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     const diamond2 = longRailDiamond(2 / 8, "far");
     const dir = normalize(sub(diamond2, corner));
     const start: Vec2 = scale(dir, 0.28); // roughly in front of the corner, on the sightline
-    const vel = scale(dir, 2.75); // medium pace
+    const vel = scale(dir, 2.1); // medium pace
     return [new BallState(start, vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING)];
   }, { section: "Reference Shots" }),
 
@@ -298,9 +298,10 @@ export const DEBUG_SCENARIOS: Scenario[] = [
     const desiredDir = normalize(sub(firstRailTarget, start));
     // Sidespin squirts the cue ball's actual initial path off the sighted line (see
     // throw_off_line above) — pre-compensate so it actually travels toward the diamond.
-    const sidespin = 0.15; // a hair of running english
+    const topspin = 0.14;
+    const sidespin = 0.36;
     const squirtAngle = -sidespin * MAX_SQUIRT_ANGLE;
     const aimDir = rotateByAngle(desiredDir, -squirtAngle);
-    return [cueStrike(start, aimDir, 3.25, 0, sidespin)];
+    return [cueStrike(start, aimDir, 3.25, topspin, sidespin)];
   }, { section: "Reference Shots" }),
 ];

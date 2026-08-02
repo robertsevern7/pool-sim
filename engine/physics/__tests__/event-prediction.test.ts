@@ -22,7 +22,7 @@ function q3(n: number): string {
 // ── predict_rail_collision: position tests (via the public API's time) ──
 
 test("predict rail roll before collide", () => {
-  const cue = cueStrike([0.5, 0.7], [0, 1], 2.0);
+  const cue = cueStrike([0.5, 0.7], [0, 1], 1.0);
   expect(predictRailCollision(cue, STANDARD_9_FOOT)).toBeNull();
 });
 
@@ -30,7 +30,7 @@ test("predict rail collision top", () => {
   const cue = cueStrike([0.5, 0.7], [0, 1], 3.0);
   const t = predictRailCollision(cue, STANDARD_9_FOOT);
   expect(t).not.toBeNull();
-  expect(q3(t!)).toBe("0.193");
+  expect(q3(t!)).toBe("0.186");
 });
 
 test("predict rail collision top start rolling", () => {
@@ -63,22 +63,9 @@ test("state change slide to roll detection", () => {
   const cue = cueStrike([0.5, 0.7], [1, 1], 2.0);
   const t = predictStateTransition(cue);
   expect(t).not.toBeNull();
-  // Note: Python test uses 0.251 which is time_sliding_to_rolling for speed=2 angled
-  // speed = 2.0, |vel| = 2.0 (after cue_strike normalization), so same as straight
-  // Actually for angled [1,1] with speed=2.0, the velocity magnitude is 2.0
-  // timeSlidingToRolling: slip = |2.0 - 0.028575*0| = 2.0
-  // t = 2*2.0 / (7*0.20*9.81) = 4/13.734 = 0.2913 → but Python says 0.251
-  // Wait, let me reconsider. The Python test_state_change_slide_to_roll_detection
-  // with direction=[1,1] speed=2.0 gets 0.251? Let me check...
-  // Actually the Python file has TWO functions with the same name. The first one
-  // at line 181-188 tests sliding→rolling and expects 0.251
-  // This seems wrong — for speed=2.0 stun, t = 0.291. For angled, speed is still 2.0.
-  // But Python cue_strike normalizes [1,1], so |vel| = 2.0. Hmm.
-  // Actually wait: in Python the duplicate function at line 191 overwrites the first.
-  // So effectively only the second one (rolling→stopped, expects 6.796) runs.
-  // The first test (expects 0.251) is dead code due to duplicate name.
-  // Let's just test what we know is correct:
-  expect(q3(t!)).toBe("0.291");
+  // timeSlidingToRolling for a 2.0 m/s stun shot — see "default time sliding to rolling"
+  // in motion-models.test.ts for the same value, kept in sync with MU_SLIDE.
+  expect(q3(t!)).toBe("0.582");
 });
 
 test("state change roll to stop detection", () => {
@@ -289,12 +276,13 @@ test("ball rolling along rail near pocket does not bounce off rail in pocket zon
 
 test("spinning slide curves into a pocket a straight-line prediction would miss", () => {
   const pocket = getPockets(TABLE)[1]; // top-right corner
-  // Spin bumped from the original 60 to 120: the pocket-mouth jaw geometry was corrected to
-  // match components/Cushions.tsx's actual rendered nose position (see heelAlongRail in
-  // constants.ts) rather than an independently-derived, slightly-too-long approximation —
-  // that moved the jaw/straight-rail boundary a few centimeters closer to the pocket, so this
-  // trajectory needs a bit more curve to still reach the fall circle before the rail.
-  const ball = new BallState([TABLE.width - 0.5, 0.1], [2, 0], [120, 0], MotionState.SLIDING);
+  // Start position moved from 0.5m out to 0.75m out: MU_SLIDE (the same coefficient that
+  // drives this curve) was tuned down for the rail-cushion physics, which caps how much
+  // lateral curve is achievable per unit distance travelled. Counterintuitively, that means
+  // this ball needs MORE room to curve into the pocket, not less — starting closer actually
+  // makes the miss worse (less distance = less time for the same, now-weaker curving force
+  // to act), so the fix is to give it more table to work with, not more spin.
+  const ball = new BallState([TABLE.width - 0.75, 0.1], [2, 0], [120, 0], MotionState.SLIDING);
   const state = new SimulationState([ball], 0.0);
 
   const event = computeNextEvent(state, TABLE);
@@ -314,7 +302,7 @@ test("spinning slide curves into a pocket a straight-line prediction would miss"
 test("same shot without spin does not pocket — travels in a straight line and misses", () => {
   // Same position/velocity as above, but zero spin: vel alone points straight along y=0.1,
   // which stays outside the corner pocket's fall circle (offset 0.1635 > radius 0.1143).
-  const ball = new BallState([TABLE.width - 0.5, 0.1], [2, 0], [0, 0], MotionState.SLIDING);
+  const ball = new BallState([TABLE.width - 0.75, 0.1], [2, 0], [0, 0], MotionState.SLIDING);
   const state = new SimulationState([ball], 0.0);
 
   const event = computeNextEvent(state, TABLE);

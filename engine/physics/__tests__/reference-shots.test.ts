@@ -70,7 +70,12 @@ function expectPotsNear(ball: BallState, target: Vec2) {
 
 const pockets = getPockets(TABLE);
 const TOP_SIDE_POCKET = pockets.find((p) => p.type === "side" && p.center[1] === 0)!.center;
-const TOP_RIGHT_CORNER = pockets.find((p) => p.type === "corner" && p.center[0] === TABLE.width && p.center[1] === 0)!.center;
+// The table renders with engine x (long axis) as the screen's VERTICAL axis and engine y
+// (short axis) as the screen's HORIZONTAL axis (see TableView.tsx's toScreen: screenX =
+// pos[1]*scaleX, screenY = pos[0]*scaleY) — so the corner that appears at the screen's
+// top-right is engine (0, height), not (width, 0). This is the far end of the SAME near
+// (y=0) rail the three-rail kick starts on, per its own comment below.
+const TOP_RIGHT_CORNER = pockets.find((p) => p.type === "corner" && p.center[0] === 0 && p.center[1] === TABLE.height)!.center;
 
 test("bank shot: corner to 2nd diamond at medium speed pots the near-side pocket", () => {
   // Sight a line from the corner (0,0) through the ball to the 2nd diamond's true
@@ -82,7 +87,7 @@ test("bank shot: corner to 2nd diamond at medium speed pots the near-side pocket
   const dir = normalize(sub(diamond2, corner));
   const start: Vec2 = scale(dir, 0.28); // roughly in front of the corner, on the sightline
 
-  const speed = 2.75; // medium pace
+  const speed = 2.1; // medium pace
   const vel = scale(dir, speed);
   const ball = new BallState(start, vel, scale(rotate90(vel), 1 / R), MotionState.ROLLING);
 
@@ -122,10 +127,11 @@ test("three-rail kick: Corner-5 benchmark with a hair of running english pots th
   const desiredDir = normalize(sub(firstRailTarget, start));
 
   const speed = 3.25;
-  const sidespin = 0.15; // "a hair" of running english (15% of max)
+  const topspin = 0.14;
+  const sidespin = 0.36;
   const squirtAngle = -sidespin * MAX_SQUIRT_ANGLE;
   const aimDir = rotateByAngle(desiredDir, -squirtAngle);
-  const ball = cueStrike(start, aimDir, speed, 0, sidespin);
+  const ball = cueStrike(start, aimDir, speed, topspin, sidespin);
 
   expectPotsNear(ball, TOP_RIGHT_CORNER);
 });

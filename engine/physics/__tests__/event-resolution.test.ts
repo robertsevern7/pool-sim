@@ -280,7 +280,7 @@ test("resolve rail collision perpendicular", () => {
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("-2.528");
+  expect(q3(ball.vel[0])).toBe("-2.730");
   expect(q3(ball.vel[1])).toBe("0.000");
 });
 
@@ -295,8 +295,8 @@ test("resolve rail collision angled", () => {
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("1.203");
-  expect(q3(ball.vel[1])).toBe("-1.786");
+  expect(q3(ball.vel[0])).toBe("1.568");
+  expect(q3(ball.vel[1])).toBe("-1.891");
 });
 
 test("resolve rail collision sets sliding", () => {
@@ -330,8 +330,8 @@ test("resolve rail collision with no sidespin has zero rail throw (regression)",
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("1.203");
-  expect(q3(ball.vel[1])).toBe("-1.786");
+  expect(q3(ball.vel[0])).toBe("1.568");
+  expect(q3(ball.vel[1])).toBe("-1.891");
 });
 
 test("resolve rail collision with sidespin changes the rebound angle (cushion throw)", () => {
@@ -346,9 +346,9 @@ test("resolve rail collision with sidespin changes the rebound angle (cushion th
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("1.503");
-  expect(q3(ball.vel[1])).toBe("-1.745");
-  expect(q3(ball.spinZ)).toBe("65.820");
+  expect(q3(ball.vel[0])).toBe("1.669");
+  expect(q3(ball.vel[1])).toBe("-1.864");
+  expect(q3(ball.spinZ)).toBe("64.498");
 });
 
 test("resolve rail collision throw direction flips with sidespin sign", () => {
@@ -535,7 +535,7 @@ test("resolve event rail collision without a normal falls back to the axis-align
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("-2.528");
+  expect(q3(ball.vel[0])).toBe("-2.730");
   expect(q3(ball.vel[1])).toBe("0.000");
 });
 
@@ -631,7 +631,7 @@ test("resolve event rail collision right wall", () => {
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0.1, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("-2.528");
+  expect(q3(ball.vel[0])).toBe("-2.730");
   expect(q3(ball.vel[1])).toBe("0.000");
   expect(ball.motion).toBe(MotionState.SLIDING);
 });
@@ -651,7 +651,7 @@ test("resolve event rail collision left wall", () => {
   const state = new SimulationState([ball], 0.0);
   const event: Event = { time: 0.1, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
-  expect(q3(ball.vel[0])).toBe("2.528");
+  expect(q3(ball.vel[0])).toBe("2.730");
   expect(q3(ball.vel[1])).toBe("0.000");
 });
 
@@ -661,7 +661,7 @@ test("resolve event rail collision bottom wall", () => {
   const event: Event = { time: 0.1, eventType: "RAIL_COLLISION", a: 0, b: null };
   resolveEvent(state, event, STANDARD_9_FOOT);
   expect(q3(ball.vel[0])).toBe("0.000");
-  expect(q3(ball.vel[1])).toBe("2.528");
+  expect(q3(ball.vel[1])).toBe("2.730");
 });
 
 // ── contact chain resolution ──
