@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { BallState } from "../engine/physics/ball-state";
+import { SPIN_MARKER_REST, Vec3 } from "../engine/physics/orientation";
 import { Trajectory } from "../engine/physics/recorder";
 import { Vec2 } from "../engine/physics/vec2";
 import type { GameRules } from "../engine/rules";
@@ -34,7 +35,7 @@ export interface SnapshotBall {
 /** Public game state exposed via context */
 export interface GameState {
   mode: Mode;
-  balls: { pos: Vec2; motion: number; number: number }[];
+  balls: { pos: Vec2; motion: number; number: number; point: Vec3; sideSpinAngle: number; rollPhase: number }[];
   trajectories: Trajectory[];
   trajectoryBallNumbers: number[];
   targetBallIndex: number | null;
@@ -120,7 +121,7 @@ export function GameProvider({ initialBalls, placeCue, children }: GameProviderP
   const currentBalls =
     state.frames.length > 0 && state.frameIndex < state.frames.length
       ? state.frames[state.frameIndex].balls
-      : state.initialBalls.map((b) => ({ pos: b.pos, motion: b.motion, number: b.number }));
+      : state.initialBalls.map((b) => ({ pos: b.pos, motion: b.motion, number: b.number, point: SPIN_MARKER_REST, sideSpinAngle: 0, rollPhase: 0 }));
 
   const gameState: GameState = {
     mode: state.mode,

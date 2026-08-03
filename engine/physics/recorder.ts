@@ -4,6 +4,7 @@ import type { Table } from "./constants";
 import { computeNextEvent } from "./event-prediction";
 import { resolveEvent } from "./event-resolution";
 import { rollingMotion, slidingMotion } from "./motion-models";
+import { advanceSpinMarker, rollRate, SPIN_MARKER_REST, Vec3 } from "./orientation";
 import { SimulationState } from "./simulation-state";
 import { BallState } from "./ball-state";
 import type { Vec2 } from "./vec2";
@@ -12,6 +13,14 @@ export interface FrameBall {
   pos: Vec2;
   motion: MotionState;
   number: number;
+  /** Where a fixed point on the ball's surface has rotated to — see orientation.ts. */
+  point: Vec3;
+  /** Signed accumulated spinZ (radians) — the real on-screen rotation angle for english. */
+  sideSpinAngle: number;
+  /** Accumulated |omega| (radians) — the roll rate, kept separate from sideSpinAngle
+   * because rotation about a horizontal axis doesn't look like an on-screen rotation
+   * (see orientation.ts's rollRate doc). */
+  rollPhase: number;
 }
 
 export interface Frame {
@@ -19,40 +28,105 @@ export interface Frame {
   balls: FrameBall[];
 }
 
-function snapshotBalls(state: SimulationState): Frame {
+// Spin markers are integrated one recorder step at a time (see orientation.ts for why
+// there's no closed form), so — unlike pos/vel/omega, which are recomputed fresh from
+// each ball's last-event baseline — they need state that persists *across* calls. Keyed
+// by ball identity rather than array index so a POCKET event's `state.balls.splice` can
+// never desync it from the balls it describes.
+interface MarkerTracker {
+  point: Vec3;
+  sideSpinAngle: number;
+  rollPhase: number;
+  /** How far into the current sliding/rolling phase (since its last real event) this marker has already caught up to. */
+  lastDt: number;
+}
+
+function getTracker(trackers: WeakMap<BallState, MarkerTracker>, ball: BallState): MarkerTracker {
+  let tracker = trackers.get(ball);
+  if (!tracker) {
+    tracker = { point: SPIN_MARKER_REST, sideSpinAngle: 0, rollPhase: 0, lastDt: 0 };
+    trackers.set(ball, tracker);
+  }
+  return tracker;
+}
+
+/** Catch a ball's marker up to `dt` (elapsed since its last real event) using `omega` at that instant. */
+function markerAt(
+  trackers: WeakMap<BallState, MarkerTracker>,
+  ball: BallState,
+  omega: Vec2,
+  dt: number,
+): MarkerTracker {
+  const tracker = getTracker(trackers, ball);
+  const deltaT = dt - tracker.lastDt;
+  if (deltaT > 0) {
+    tracker.point = advanceSpinMarker(tracker.point, omega, ball.spinZ, deltaT);
+    tracker.sideSpinAngle += ball.spinZ * deltaT;
+    tracker.rollPhase += rollRate(omega) * deltaT;
+    tracker.lastDt = dt;
+  }
+  return tracker;
+}
+
+/** Reset a ball's marker back to `dt = 0` — call once its state has actually committed to a new baseline. */
+function resetTracker(trackers: WeakMap<BallState, MarkerTracker>, ball: BallState): void {
+  getTracker(trackers, ball).lastDt = 0;
+}
+
+function snapshotBalls(state: SimulationState, trackers: WeakMap<BallState, MarkerTracker>): Frame {
   return {
     time: state.time,
-    balls: state.balls.map((b) => ({ pos: [b.pos[0], b.pos[1]], motion: b.motion, number: b.number })),
+    balls: state.balls.map((b) => {
+      const tracker = getTracker(trackers, b);
+      return {
+        pos: [b.pos[0], b.pos[1]],
+        motion: b.motion,
+        number: b.number,
+        point: tracker.point,
+        sideSpinAngle: tracker.sideSpinAngle,
+        rollPhase: tracker.rollPhase,
+      };
+    }),
   };
 }
 
-function interpolateState(state: SimulationState, dt: number): Frame {
+function interpolateState(
+  state: SimulationState,
+  dt: number,
+  trackers: WeakMap<BallState, MarkerTracker>,
+): Frame {
   const balls = state.balls.map((ball) => {
     if (ball.motion === MotionState.SLIDING) {
-      const { pos } = slidingMotion(ball, dt, G);
-      return { pos: pos as Vec2, motion: ball.motion, number: ball.number };
+      const { pos, omega } = slidingMotion(ball, dt, G);
+      const tracker = markerAt(trackers, ball, omega, dt);
+      return { pos: pos as Vec2, motion: ball.motion, number: ball.number, point: tracker.point, sideSpinAngle: tracker.sideSpinAngle, rollPhase: tracker.rollPhase };
     } else if (ball.motion === MotionState.ROLLING) {
-      const { pos } = rollingMotion(ball, dt, G);
-      return { pos: pos as Vec2, motion: ball.motion, number: ball.number };
+      const { pos, omega } = rollingMotion(ball, dt, G);
+      const tracker = markerAt(trackers, ball, omega, dt);
+      return { pos: pos as Vec2, motion: ball.motion, number: ball.number, point: tracker.point, sideSpinAngle: tracker.sideSpinAngle, rollPhase: tracker.rollPhase };
     }
-    return { pos: [ball.pos[0], ball.pos[1]] as Vec2, motion: ball.motion, number: ball.number };
+    const tracker = getTracker(trackers, ball);
+    return { pos: [ball.pos[0], ball.pos[1]] as Vec2, motion: ball.motion, number: ball.number, point: tracker.point, sideSpinAngle: tracker.sideSpinAngle, rollPhase: tracker.rollPhase };
   });
   return { time: state.time + dt, balls };
 }
 
-function advanceState(state: SimulationState, dt: number): void {
+function advanceState(state: SimulationState, dt: number, trackers: WeakMap<BallState, MarkerTracker>): void {
   for (const ball of state.balls) {
     if (ball.motion === MotionState.SLIDING) {
       const r = slidingMotion(ball, dt, G);
+      markerAt(trackers, ball, r.omega, dt);
       ball.pos = r.pos;
       ball.vel = r.vel;
       ball.omega = r.omega;
     } else if (ball.motion === MotionState.ROLLING) {
       const r = rollingMotion(ball, dt, G);
+      markerAt(trackers, ball, r.omega, dt);
       ball.pos = r.pos;
       ball.vel = r.vel;
       ball.omega = r.omega;
     }
+    resetTracker(trackers, ball);
   }
   state.time += dt;
 }
@@ -77,6 +151,8 @@ export function recordTrajectories(
   );
   const state = new SimulationState(balls, 0);
   const maxEvents = 10000;
+  // recordTrajectories doesn't render spin, but advanceState needs a tracker map regardless.
+  const trackers = new WeakMap<BallState, MarkerTracker>();
 
   const trajectories: Trajectory[] = balls.map((b) => [
     { pos: [b.pos[0], b.pos[1]] as Vec2, ghost: false },
@@ -92,7 +168,7 @@ export function recordTrajectories(
 
     const dt = event.time - state.time;
     if (dt < 0) break;
-    advanceState(state, dt);
+    advanceState(state, dt, trackers);
 
     const isCollision = event.eventType === "BALL_COLLISION" || event.eventType === "RAIL_COLLISION";
 
@@ -166,7 +242,8 @@ export function recordSimulation(
   );
   const state = new SimulationState(balls, 0);
   const interval = 1 / fps;
-  const frames: Frame[] = [snapshotBalls(state)];
+  const trackers = new WeakMap<BallState, MarkerTracker>();
+  const frames: Frame[] = [snapshotBalls(state, trackers)];
   const maxEvents = 10000;
   let nextFrameTime = interval;
 
@@ -180,7 +257,7 @@ export function recordSimulation(
 
     if (event === null) {
       if (state.time < nextFrameTime) {
-        frames.push(snapshotBalls(state));
+        frames.push(snapshotBalls(state, trackers));
       }
       break;
     }
@@ -189,13 +266,13 @@ export function recordSimulation(
 
     while (nextFrameTime <= eventTime) {
       const dt = nextFrameTime - state.time;
-      frames.push(interpolateState(state, dt));
+      frames.push(interpolateState(state, dt, trackers));
       nextFrameTime += interval;
     }
 
     const dt = eventTime - state.time;
     if (dt < 0) break;
-    advanceState(state, dt);
+    advanceState(state, dt, trackers);
 
     // Track first hit by cue ball
     if (event.eventType === "BALL_COLLISION") {

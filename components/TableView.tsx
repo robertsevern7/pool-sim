@@ -325,6 +325,9 @@ function TableContent({ hasControls }: { hasControls: boolean }) {
             y={border + ball.pos[0] * scaleY}
             radius={ballRadius}
             ballNumber={ball.number}
+            point={ball.point}
+            sideSpinAngle={ball.sideSpinAngle}
+            rollPhase={ball.rollPhase}
             onPress={
               canAim && ball.number !== 0
                 ? () => { setTarget(i); setShowAiming(true); }
